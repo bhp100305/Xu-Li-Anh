@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Document Scanner - Xử lý ảnh
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+
+<body>
+
+    <main class="container">
+
+        <!-- ============================= -->
+        <!-- HEADER -->
+        <!-- ============================= -->
+
+        <header class="header">
+
+            <div>
+
+                <p class="eyebrow">
+                    XỬ LÝ ẢNH SỐ
+                </p>
+
+                <h1>
+                    Document Scanner
+                </h1>
+
+                <p class="subtitle">
+                    Phát hiện biên, xác định tài liệu,
+                    nắn phối cảnh và làm nét ảnh.
+                </p>
+
+            </div>
+
+
+            <div class="top-actions">
+
+                <a
+                    href="#compare"
+                    class="button-secondary"
+                >
+                    So sánh thuật toán
+                </a>
+
+            </div>
+
+        </header>
+
+
+        <!-- ============================= -->
+        <!-- HIỂN THỊ LỖI -->
+        <!-- ============================= -->
+
+        {% if error %}
+
+        <div class="alert-error">
+            {{ error }}
+        </div>
+
+        {% endif %}
+
+
+        <!-- ============================= -->
+        <nav class="dashboard-tabs"><button type="button" class="tab-button {% if active_tab != 'compare' %}active{% endif %}" data-tab="scan-panel">Scan tài liệu</button><button type="button" class="tab-button {% if active_tab == 'compare' %}active{% endif %}" data-tab="compare-panel">So sánh thuật toán</button></nav>
+        <section id="compare-panel" class="scanner-card tab-panel {% if active_tab != 'compare' %}hidden{% endif %}"><form action="/" method="POST" enctype="multipart/form-data"><input type="hidden" name="action" value="compare"><div class="form-section"><h2>So sánh thuật toán phát hiện biên</h2><p class="section-description">Sobel, Prewitt, Laplacian, LoG, Canny tự cài và OpenCV Canny.</p><label class="upload-box"><div class="upload-icon">↑</div><div class="upload-text"><strong>Chọn ảnh</strong><span>JPG, PNG, BMP hoặc WEBP</span></div><input type="file" name="image" accept="image/*" required></label></div><button class="scan-button" type="submit">Chạy so sánh</button></form></section>        <!-- FORM UPLOAD -->
+        <!-- ============================= -->
+
+        <section id="scan-panel" class="scanner-card tab-panel {% if active_tab == 'compare' %}hidden{% endif %}">
+
+            <form
+                id="scanForm"
+                action="/"
+                method="POST"
+                enctype="multipart/form-data"
+            >
+                <input type="hidden" name="action" value="scan">
+
+                <!-- ============================= -->
+                <!-- UPLOAD IMAGE -->
+                <!-- ============================= -->
+
+                <div class="form-section">
+
+                    <h2>
+                        1. Chọn ảnh tài liệu
+                    </h2>
+
+                    <p class="section-description">
+                        Hỗ trợ JPG, JPEG, PNG, BMP và WEBP.
+                        Dung lượng tối đa 15 MB.
+                    </p>
+
+
+                    <label
+                        for="imageInput"
+                        class="upload-box"
+                        id="uploadBox"
+                    >
+
+                        <div class="upload-icon">
+                            ↑
+                        </div>
+
+                        <div class="upload-text">
+
+                            <strong>
+                                Nhấn để chọn ảnh
+                            </strong>
+
+                            <span>
+                                hoặc kéo ảnh vào khu vực này
+                            </span>
+
+                        </div>
+
+                    </label>
+
+
+                    <input
+                        type="file"
+                        id="imageInput"
+                        name="image"
+                        accept=".jpg,.jpeg,.png,.bmp,.webp,image/*"
+                        required
+                        hidden
+                    >
+
+
+                    <!-- ============================= -->
+                    <!-- PREVIEW -->
+                    <!-- ============================= -->
+
+                    <div
+                        class="preview-wrapper hidden"
+                        id="previewWrapper"
+                    >
+
+                        <p class="preview-title">
+                            Ảnh đã chọn
+                        </p>
+
+                        <img
+                            id="imagePreview"
+                            class="image-preview"
+                            alt="Ảnh xem trước"
+                        >
+
+                        <div
+                            class="file-information"
+                            id="fileInformation"
+                        >
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ============================= -->
+                <!-- SHARPEN METHOD -->
+                <!-- ============================= -->
+
+                <div class="form-section">
+
+                    <h2>
+                        2. Phương pháp làm nét
+                    </h2>
+
+                    <p class="section-description">
+                        Chọn phương pháp xử lý ảnh sau khi
+                        nắn phối cảnh.
+                    </p>
+
+
+                    <div class="method-grid">
+
+                        <label class="method-card">
+
+                            <input
+                                type="radio"
+                                name="sharpening_method"
+                                value="unsharp"
+                                checked
+                            >
+
+                            <div class="method-content">
+
+                                <strong>
+                                    Unsharp Masking
+                                </strong>
+
+                                <span>
+                                    Làm nét cân bằng,
+                                    phù hợp tài liệu thông thường.
+                                </span>
+
+                            </div>
+
+                        </label>
+
+
+                        <label class="method-card">
+
+                            <input
+                                type="radio"
+                                name="sharpening_method"
+                                value="highboost"
+                            >
+
+                            <div class="method-content">
+
+                                <strong>
+                                    High Boost
+                                </strong>
+
+                                <span>
+                                    Khuếch đại chi tiết mạnh hơn,
+                                    phù hợp ảnh hơi mờ.
+                                </span>
+
+                            </div>
+
+                        </label>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ============================= -->
+                <!-- STRENGTH -->
+                <!-- ============================= -->
+
+                <div class="form-section">
+
+                    <h2>
+                        3. Cường độ làm nét
+                    </h2>
+
+
+                    <div class="range-row">
+
+                        <input
+                            type="range"
+                            id="strengthRange"
+                            name="sharpening_strength"
+                            min="0.5"
+                            max="3.0"
+                            step="0.1"
+                            value="1.0"
+                        >
+
+                        <span
+                            class="range-value"
+                            id="strengthValue"
+                        >
+                            1.0
+                        </span>
+
+                    </div>
+
+
+                    <div class="range-labels">
+
+                        <span>
+                            Nhẹ
+                        </span>
+
+                        <span>
+                            Mạnh
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ============================= -->
+                <!-- PIPELINE INFO -->
+                <!-- ============================= -->
+
+                <div class="pipeline-box">
+
+                    <h3>
+                        Quy trình xử lý
+                    </h3>
+
+
+                    <div class="pipeline">
+
+                        <div class="pipeline-item">
+
+                            <span>
+                                1
+                            </span>
+
+                            Canny
+
+                        </div>
+
+
+                        <div class="pipeline-arrow">
+                            →
+                        </div>
+
+
+                        <div class="pipeline-item">
+
+                            <span>
+                                2
+                            </span>
+
+                            Phát hiện tài liệu
+
+                        </div>
+
+
+                        <div class="pipeline-arrow">
+                            →
+                        </div>
+
+
+                        <div class="pipeline-item">
+
+                            <span>
+                                3
+                            </span>
+
+                            Perspective
+
+                        </div>
+
+
+                        <div class="pipeline-arrow">
+                            →
+                        </div>
+
+
+                        <div class="pipeline-item">
+
+                            <span>
+                                4
+                            </span>
+
+                            Sharpen
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ============================= -->
+                <!-- SUBMIT -->
+                <!-- ============================= -->
+
+                <button
+                    type="submit"
+                    class="scan-button"
+                    id="scanButton"
+                >
+                    Bắt đầu Scan
+                </button>
+
+
+                <!-- ============================= -->
+                <!-- LOADING -->
+                <!-- ============================= -->
+
+                <div
+                    class="loading hidden"
+                    id="loading"
+                >
+
+                    <div class="spinner">
+                    </div>
+
+                    <div>
+
+                        <strong>
+                            Đang xử lý ảnh...
+                        </strong>
+
+                        <p>
+                            Canny tự cài đặt đang phân tích
+                            ảnh tài liệu.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </form>
+
+        </section>
+
+
+        <!-- ============================= -->
+        <!-- FEATURE INFO -->
+        <!-- ============================= -->
+
+        <section class="result-section">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        CHỨC NĂNG
+                    </p>
+
+                    <h2>
+                        Hệ thống hiện có
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="pipeline-summary">
+
+
+                <div>
+
+                    <span class="summary-number">
+                        1
+                    </span>
+
+                    <strong>
+                        Document Scanner
+                    </strong>
+
+                    <p>
+                        Phát hiện 4 góc tài liệu,
+                        nắn phối cảnh và làm nét.
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <span class="summary-number">
+                        2
+                    </span>
+
+                    <strong>
+                        Canny tự cài
+                    </strong>
+
+                    <p>
+                        Gaussian, Sobel Gradient,
+                        NMS, Double Threshold và Hysteresis.
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <span class="summary-number">
+                        3
+                    </span>
+
+                    <strong>
+                        Sharpening
+                    </strong>
+
+                    <p>
+                        Hỗ trợ Unsharp Masking
+                        và High Boost Filtering.
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <span class="summary-number">
+                        4
+                    </span>
+
+                    <strong>
+                        Compare Algorithms
+                    </strong>
+
+                    <p>
+                        So sánh Sobel, Prewitt,
+                        Laplacian, LoG và Canny.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+    {% if results %}<section class="result-section"><h2>Kết quả so sánh</h2><div class="result-grid">{% for item in results %}<article class="result-card"><div class="result-card-header"><h3>{{ item.name }} · {{ item.time }}s</h3></div><div class="result-image-wrapper"><img class="result-image" src="{{ url_for('static', filename=item.image) }}" alt="{{ item.name }}"></div></article>{% endfor %}</div></section>{% endif %}
+    {% if final_image %}<section class="result-section"><h2>Kết quả scan</h2><div class="result-grid"><article class="result-card"><h3>Ảnh gốc</h3><img class="result-image" src="{{ url_for('static', filename=original_image) }}" alt="Ảnh gốc"></article><article class="result-card"><h3>Canny</h3><img class="result-image" src="{{ url_for('static', filename=edge_image) }}" alt="Canny"></article><article class="result-card"><h3>Detection</h3><img class="result-image" src="{{ url_for('static', filename=detection_image) }}" alt="Detection"></article><article class="result-card"><h3>Perspective</h3><img class="result-image" src="{{ url_for('static', filename=perspective_image) }}" alt="Perspective"></article></div><h3>Final result</h3><img class="final-image" src="{{ url_for('static', filename=final_image) }}" alt="Kết quả cuối"><a class="button-primary" href="{{ url_for('static', filename=final_image) }}" download>Tải ảnh</a></section>{% endif %}    </main>
+
+
+    <!-- ============================= -->
+    <!-- JAVASCRIPT -->
+    <!-- ============================= -->
+
+    <script>
+
+        const imageInput =
+            document.getElementById(
+                "imageInput"
+            );
+
+        const imagePreview =
+            document.getElementById(
+                "imagePreview"
+            );
+
+        const previewWrapper =
+            document.getElementById(
+                "previewWrapper"
+            );
+
+        const fileInformation =
+            document.getElementById(
+                "fileInformation"
+            );
+
+        const strengthRange =
+            document.getElementById(
+                "strengthRange"
+            );
+
+        const strengthValue =
+            document.getElementById(
+                "strengthValue"
+            );
+
+        const scanForm =
+            document.getElementById(
+                "scanForm"
+            );
+
+        const scanButton =
+            document.getElementById(
+                "scanButton"
+            );
+
+        const loading =
+            document.getElementById(
+                "loading"
+            );
+
+        const uploadBox =
+            document.getElementById(
+                "uploadBox"
+            );
+
+
+        // ======================================
+        // PREVIEW ẢNH
+        // ======================================
+
+        imageInput.addEventListener(
+            "change",
+            function () {
+
+                const file =
+                    imageInput.files[0];
+
+
+                if (!file) {
+
+                    previewWrapper
+                        .classList
+                        .add(
+                            "hidden"
+                        );
+
+                    return;
+                }
+
+
+                // Kiểm tra dung lượng phía client
+                const maxSize =
+                    15 * 1024 * 1024;
+
+
+                if (
+                    file.size > maxSize
+                ) {
+
+                    alert(
+                        "Ảnh vượt quá 15 MB."
+                    );
+
+                    imageInput.value =
+                        "";
+
+                    previewWrapper
+                        .classList
+                        .add(
+                            "hidden"
+                        );
+
+                    return;
+                }
+
+
+                const reader =
+                    new FileReader();
+
+
+                reader.onload =
+                    function (event) {
+
+                        imagePreview.src =
+                            event.target.result;
+
+
+                        previewWrapper
+                            .classList
+                            .remove(
+                                "hidden"
+                            );
+
+                    };
+
+
+                reader.readAsDataURL(
+                    file
+                );
+
+
+                const fileSizeMB =
+                    (
+                        file.size
+                        / 1024
+                        / 1024
+                    ).toFixed(2);
+
+
+                fileInformation.innerHTML =
+                    `
+                        <span>
+                            ${file.name}
+                        </span>
+
+                        <span>
+                            ${fileSizeMB} MB
+                        </span>
+                    `;
+
+            }
+        );
+
+
+        // ======================================
+        // STRENGTH RANGE
+        // ======================================
+
+        strengthRange.addEventListener(
+            "input",
+            function () {
+
+                strengthValue.textContent =
+                    Number(
+                        strengthRange.value
+                    ).toFixed(1);
+
+            }
+        );
+
+
+        // ======================================
+        // LOADING KHI SUBMIT
+        // ======================================
+
+        scanForm.addEventListener(
+            "submit",
+            function (event) {
+
+                if (
+                    !imageInput.files[0]
+                ) {
+
+                    event.preventDefault();
+
+                    alert(
+                        "Hãy chọn ảnh trước khi scan."
+                    );
+
+                    return;
+                }
+
+
+                scanButton.disabled =
+                    true;
+
+
+                scanButton.textContent =
+                    "Đang xử lý...";
+
+
+                loading
+                    .classList
+                    .remove(
+                        "hidden"
+                    );
+
+            }
+        );
+
+
+        // ======================================
+        // DRAG OVER
+        // ======================================
+
+        uploadBox.addEventListener(
+            "dragover",
+            function (event) {
+
+                event.preventDefault();
+
+
+                uploadBox
+                    .classList
+                    .add(
+                        "dragging"
+                    );
+
+            }
+        );
+
+
+        // ======================================
+        // DRAG LEAVE
+        // ======================================
+
+        uploadBox.addEventListener(
+            "dragleave",
+            function () {
+
+                uploadBox
+                    .classList
+                    .remove(
+                        "dragging"
+                    );
+
+            }
+        );
+
+
+        // ======================================
+        // DROP FILE
+        // ======================================
+
+        uploadBox.addEventListener(
+            "drop",
+            function (event) {
+
+                event.preventDefault();
+
+
+                uploadBox
+                    .classList
+                    .remove(
+                        "dragging"
+                    );
+
+
+                const files =
+                    event.dataTransfer.files;
+
+
+                if (
+                    files.length === 0
+                ) {
+                    return;
+                }
+
+
+                const firstFile =
+                    files[0];
+
+
+                if (
+                    !firstFile.type
+                        .startsWith(
+                            "image/"
+                        )
+                ) {
+
+                    alert(
+                        "File được chọn không phải ảnh."
+                    );
+
+                    return;
+                }
+
+
+                const dataTransfer =
+                    new DataTransfer();
+
+
+                dataTransfer.items.add(
+                    firstFile
+                );
+
+
+                imageInput.files =
+                    dataTransfer.files;
+
+
+                imageInput.dispatchEvent(
+                    new Event(
+                        "change"
+                    )
+                );
+
+            }
+        );
+
+    </script>
+
+<script>document.querySelectorAll(".tab-button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab-button").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab-panel").forEach(p=>{p.classList.add("hidden");p.querySelectorAll("input,select,textarea,button").forEach(c=>c.disabled=true)});b.classList.add("active");const panel=document.getElementById(b.dataset.tab);panel.classList.remove("hidden");panel.querySelectorAll("input,select,textarea,button").forEach(c=>c.disabled=false)}));document.querySelectorAll(".tab-panel").forEach(p=>{const active=!p.classList.contains("hidden");p.querySelectorAll("input,select,textarea,button").forEach(c=>c.disabled=!active)});</script>
+
+</body>
+
+</html>
+
+
+
+
+
+

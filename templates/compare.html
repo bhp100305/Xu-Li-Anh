@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        So sánh thuật toán phát hiện biên
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+<main class="container">
+
+
+    <!-- ================================= -->
+    <!-- HEADER -->
+    <!-- ================================= -->
+
+    <header class="header">
+
+        <div>
+
+            <p class="eyebrow">
+                EDGE DETECTION
+            </p>
+
+            <h1>
+                So sánh thuật toán
+            </h1>
+
+            <p class="subtitle">
+                So sánh Sobel, Prewitt, Laplacian,
+                LoG, Canny tự cài và OpenCV Canny
+                trên cùng một ảnh.
+            </p>
+
+        </div>
+
+
+        <a
+            href="{{ url_for('index') }}"
+            class="button-secondary"
+        >
+            ← Document Scanner
+        </a>
+
+    </header>
+
+
+
+    <!-- ================================= -->
+    <!-- UPLOAD FORM -->
+    <!-- ================================= -->
+
+    {% if not comparison %}
+
+    <section class="scanner-card">
+
+        <form
+            action="/compare"
+            method="POST"
+            enctype="multipart/form-data"
+        >
+
+
+            <div class="form-section">
+
+                <h2>
+                    Chọn ảnh để so sánh
+                </h2>
+
+                <p class="section-description">
+                    Một ảnh sẽ được đưa qua tất cả
+                    các thuật toán phát hiện biên.
+                </p>
+
+
+                <label
+                    for="compareImage"
+                    class="upload-box"
+                >
+
+                    <div class="upload-icon">
+                        ↑
+                    </div>
+
+
+                    <div class="upload-text">
+
+                        <strong>
+                            Chọn ảnh
+                        </strong>
+
+                        <span>
+                            JPG, JPEG, PNG, BMP hoặc WEBP
+                        </span>
+
+                    </div>
+
+                </label>
+
+
+                <input
+                    type="file"
+                    id="compareImage"
+                    name="image"
+                    accept="image/*"
+                    required
+                    hidden
+                >
+
+
+                <div
+                    id="comparePreviewWrapper"
+                    class="preview-wrapper hidden"
+                >
+
+                    <p class="preview-title">
+                        Ảnh đã chọn
+                    </p>
+
+                    <img
+                        id="comparePreview"
+                        class="image-preview"
+                        alt="Preview"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <button
+                type="submit"
+                class="scan-button"
+                id="compareButton"
+            >
+                Bắt đầu so sánh
+            </button>
+
+
+            <div
+                class="loading hidden"
+                id="compareLoading"
+            >
+
+                <div class="spinner">
+                </div>
+
+                <div>
+
+                    <strong>
+                        Đang chạy 6 thuật toán...
+                    </strong>
+
+                    <p>
+                        Các thuật toán tự cài đặt
+                        có thể cần một chút thời gian.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </form>
+
+    </section>
+
+
+    {% else %}
+
+
+
+    <!-- ================================= -->
+    <!-- RESULT INFORMATION -->
+    <!-- ================================= -->
+
+    <section class="result-hero">
+
+        <div class="success-badge">
+            ✓ Hoàn thành
+        </div>
+
+        <h2>
+            So sánh phát hiện biên
+        </h2>
+
+        <p>
+            Kích thước ảnh xử lý:
+            {{ width }} × {{ height }}
+        </p>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- THRESHOLD -->
+    <!-- ================================= -->
+
+    <section class="metrics-grid">
+
+
+        <div class="metric-card">
+
+            <span class="metric-label">
+                Low Threshold
+            </span>
+
+            <strong class="metric-value">
+                {{ low_threshold }}
+            </strong>
+
+        </div>
+
+
+        <div class="metric-card">
+
+            <span class="metric-label">
+                High Threshold
+            </span>
+
+            <strong class="metric-value">
+                {{ high_threshold }}
+            </strong>
+
+        </div>
+
+
+        <div class="metric-card">
+
+            <span class="metric-label">
+                Thuật toán
+            </span>
+
+            <strong class="metric-value">
+                6
+            </strong>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- ORIGINAL -->
+    <!-- ================================= -->
+
+    <section class="result-section">
+
+        <div class="section-heading">
+
+            <div>
+
+                <p class="eyebrow">
+                    INPUT
+                </p>
+
+                <h2>
+                    Ảnh đầu vào
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <article class="result-card">
+
+            <div class="final-image-wrapper">
+
+                <img
+                    src="{{ url_for('static', filename=original_image) }}"
+                    class="final-image"
+                    alt="Ảnh gốc"
+                >
+
+            </div>
+
+        </article>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- ALGORITHM RESULTS -->
+    <!-- ================================= -->
+
+    <section class="result-section">
+
+        <div class="section-heading">
+
+            <div>
+
+                <p class="eyebrow">
+                    COMPARISON
+                </p>
+
+                <h2>
+                    Kết quả các thuật toán
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="result-grid">
+
+
+            {% for item in results %}
+
+            <article class="result-card">
+
+                <div class="result-card-header">
+
+                    <span class="step-number">
+                        {{ loop.index }}
+                    </span>
+
+
+                    <div>
+
+                        <h3>
+                            {{ item.name }}
+                        </h3>
+
+                        <p>
+                            Thời gian:
+                            {{ item.time }} giây
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="result-image-wrapper dark-image"
+                >
+
+                    <img
+                        src="{{ url_for('static', filename=item.image) }}"
+                        class="result-image"
+                        alt="{{ item.name }}"
+                    >
+
+                </div>
+
+            </article>
+
+            {% endfor %}
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- TIME TABLE -->
+    <!-- ================================= -->
+
+    <section class="result-section">
+
+        <div class="section-heading">
+
+            <div>
+
+                <p class="eyebrow">
+                    PERFORMANCE
+                </p>
+
+                <h2>
+                    Thời gian xử lý
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="corners-card">
+
+            <div class="table-wrapper">
+
+                <table class="corner-table">
+
+                    <thead>
+
+                    <tr>
+
+                        <th>
+                            #
+                        </th>
+
+                        <th>
+                            Thuật toán
+                        </th>
+
+                        <th>
+                            Thời gian
+                        </th>
+
+                    </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                    {% for item in results %}
+
+                    <tr>
+
+                        <td>
+                            {{ loop.index }}
+                        </td>
+
+                        <td>
+                            {{ item.name }}
+                        </td>
+
+                        <td>
+                            {{ item.time }} s
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- EXPLANATION -->
+    <!-- ================================= -->
+
+    <section class="result-section">
+
+        <div class="pipeline-summary">
+
+
+            <div>
+
+                <span class="summary-number">
+                    1
+                </span>
+
+                <strong>
+                    Sobel
+                </strong>
+
+                <p>
+                    Gradient bậc một,
+                    có trọng số lớn hơn ở tâm.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <span class="summary-number">
+                    2
+                </span>
+
+                <strong>
+                    Prewitt
+                </strong>
+
+                <p>
+                    Gradient bậc một
+                    với kernel đơn giản hơn Sobel.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <span class="summary-number">
+                    3
+                </span>
+
+                <strong>
+                    Laplacian
+                </strong>
+
+                <p>
+                    Đạo hàm bậc hai,
+                    nhạy với biên và nhiễu.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <span class="summary-number">
+                    4
+                </span>
+
+                <strong>
+                    LoG
+                </strong>
+
+                <p>
+                    Gaussian smoothing,
+                    Laplacian và Zero Crossing.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <span class="summary-number">
+                    5
+                </span>
+
+                <strong>
+                    Canny tự cài
+                </strong>
+
+                <p>
+                    Gaussian, Gradient,
+                    NMS, Threshold và Hysteresis.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <span class="summary-number">
+                    6
+                </span>
+
+                <strong>
+                    OpenCV Canny
+                </strong>
+
+                <p>
+                    Phiên bản thư viện dùng
+                    làm kết quả đối chiếu.
+                </p>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- ACTION -->
+    <!-- ================================= -->
+
+    <div class="bottom-actions">
+
+        <a
+            href="/compare"
+            class="button-secondary"
+        >
+            So sánh ảnh khác
+        </a>
+
+
+        <a
+            href="{{ url_for('index') }}"
+            class="button-primary"
+        >
+            Document Scanner
+        </a>
+
+    </div>
+
+
+    {% endif %}
+
+
+</main>
+
+
+
+<script>
+
+    const compareInput =
+        document.getElementById(
+            "compareImage"
+        );
+
+    const previewWrapper =
+        document.getElementById(
+            "comparePreviewWrapper"
+        );
+
+    const preview =
+        document.getElementById(
+            "comparePreview"
+        );
+
+    const compareButton =
+        document.getElementById(
+            "compareButton"
+        );
+
+    const compareLoading =
+        document.getElementById(
+            "compareLoading"
+        );
+
+
+    if (compareInput) {
+
+        compareInput.addEventListener(
+            "change",
+            function () {
+
+                const file =
+                    compareInput.files[0];
+
+                if (!file) {
+                    return;
+                }
+
+
+                const reader =
+                    new FileReader();
+
+
+                reader.onload =
+                    function (event) {
+
+                        preview.src =
+                            event.target.result;
+
+                        previewWrapper
+                            .classList
+                            .remove(
+                                "hidden"
+                            );
+
+                    };
+
+
+                reader.readAsDataURL(
+                    file
+                );
+
+            }
+        );
+
+    }
+
+
+    if (compareButton) {
+
+        const form =
+            compareButton.closest(
+                "form"
+            );
+
+
+        form.addEventListener(
+            "submit",
+            function () {
+
+                compareButton.disabled =
+                    true;
+
+                compareButton.textContent =
+                    "Đang so sánh...";
+
+
+                compareLoading
+                    .classList
+                    .remove(
+                        "hidden"
+                    );
+
+            }
+        );
+
+    }
+
+</script>
+
+
+</body>
+
+</html>

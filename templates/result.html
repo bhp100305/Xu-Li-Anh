@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Kết quả Scan - Document Scanner
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+
+<body>
+
+    <main class="container">
+
+
+        <!-- ================================== -->
+        <!-- HEADER -->
+        <!-- ================================== -->
+
+        <header class="header result-header">
+
+            <div>
+
+                <p class="eyebrow">
+                    XỬ LÝ ẢNH SỐ
+                </p>
+
+                <h1>
+                    Kết quả Scan
+                </h1>
+
+                <p class="subtitle">
+                    Pipeline xử lý tài liệu đã hoàn thành.
+                </p>
+
+            </div>
+
+
+            <div class="top-actions">
+
+                <a
+                    href="{{ url_for('index') }}"
+                    class="button-secondary"
+                >
+                    Scan ảnh khác
+                </a>
+
+                <a
+                    href="{{ url_for('static', filename=final_image) }}"
+                    class="button-primary"
+                    download
+                >
+                    Tải ảnh kết quả
+                </a>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- ================================== -->
+        <!-- SUCCESS -->
+        <!-- ================================== -->
+
+        <section class="result-hero">
+
+            <div class="success-badge">
+                ✓ Xử lý thành công
+            </div>
+
+            <h2>
+                Document Scanner đã hoàn tất
+            </h2>
+
+            <p>
+                Ảnh đã được phát hiện biên,
+                xác định vùng tài liệu,
+                nắn phối cảnh và làm nét.
+            </p>
+
+        </section>
+
+
+
+        <!-- ================================== -->
+        <!-- THÔNG SỐ -->
+        <!-- ================================== -->
+
+        <section class="metrics-grid">
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    Thời gian xử lý
+                </span>
+
+                <strong class="metric-value">
+                    {{ processing_time }}s
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    Low Threshold
+                </span>
+
+                <strong class="metric-value">
+                    {{ low_threshold }}
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    High Threshold
+                </span>
+
+                <strong class="metric-value">
+                    {{ high_threshold }}
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    Kích thước ảnh cuối
+                </span>
+
+                <strong class="metric-value">
+                    {{ width }} × {{ height }}
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    Làm nét
+                </span>
+
+                <strong class="metric-value">
+
+                    {% if sharpening_method == "highboost" %}
+                        High Boost
+                    {% else %}
+                        Unsharp
+                    {% endif %}
+
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    Strength
+                </span>
+
+                <strong class="metric-value">
+                    {{ sharpening_strength }}
+                </strong>
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- ================================== -->
+        <!-- PIPELINE -->
+        <!-- ================================== -->
+
+        <section class="result-section">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        PIPELINE
+                    </p>
+
+                    <h2>
+                        Các bước xử lý
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="result-grid">
+
+
+                <!-- ORIGINAL -->
+
+                <article class="result-card">
+
+                    <div class="result-card-header">
+
+                        <span class="step-number">
+                            01
+                        </span>
+
+                        <div>
+
+                            <h3>
+                                Ảnh gốc
+                            </h3>
+
+                            <p>
+                                Ảnh tài liệu ban đầu.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="result-image-wrapper">
+
+                        <img
+                            src="{{ url_for('static', filename=original_image) }}"
+                            alt="Ảnh gốc"
+                            class="result-image"
+                        >
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- EDGE -->
+
+                <article class="result-card">
+
+                    <div class="result-card-header">
+
+                        <span class="step-number">
+                            02
+                        </span>
+
+                        <div>
+
+                            <h3>
+                                Canny Edge
+                            </h3>
+
+                            <p>
+                                Biên phát hiện bằng Canny tự cài đặt.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="result-image-wrapper dark-image">
+
+                        <img
+                            src="{{ url_for('static', filename=edge_image) }}"
+                            alt="Canny Edge"
+                            class="result-image"
+                        >
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- DOCUMENT DETECTION -->
+
+                <article class="result-card">
+
+                    <div class="result-card-header">
+
+                        <span class="step-number">
+                            03
+                        </span>
+
+                        <div>
+
+                            <h3>
+                                Phát hiện tài liệu
+                            </h3>
+
+                            <p>
+                                Xác định contour và bốn góc trang giấy.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="result-image-wrapper">
+
+                        <img
+                            src="{{ url_for('static', filename=detection_image) }}"
+                            alt="Phát hiện tài liệu"
+                            class="result-image"
+                        >
+
+                    </div>
+
+                </article>
+
+
+
+                <!-- PERSPECTIVE -->
+
+                <article class="result-card">
+
+                    <div class="result-card-header">
+
+                        <span class="step-number">
+                            04
+                        </span>
+
+                        <div>
+
+                            <h3>
+                                Perspective Transform
+                            </h3>
+
+                            <p>
+                                Nắn tài liệu về góc nhìn chính diện.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="result-image-wrapper">
+
+                        <img
+                            src="{{ url_for('static', filename=perspective_image) }}"
+                            alt="Perspective Transform"
+                            class="result-image"
+                        >
+
+                    </div>
+
+                </article>
+
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================================== -->
+        <!-- FINAL RESULT -->
+        <!-- ================================== -->
+
+        <section class="result-section">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        FINAL OUTPUT
+                    </p>
+
+                    <h2>
+                        Ảnh Scan cuối cùng
+                    </h2>
+
+                </div>
+
+
+                <a
+                    href="{{ url_for('static', filename=final_image) }}"
+                    class="button-primary"
+                    download
+                >
+                    Tải ảnh
+                </a>
+
+            </div>
+
+
+            <article class="result-card final-result-card">
+
+                <div class="final-image-wrapper">
+
+                    <img
+                        src="{{ url_for('static', filename=final_image) }}"
+                        alt="Kết quả scan cuối"
+                        class="final-image"
+                    >
+
+                </div>
+
+            </article>
+
+        </section>
+
+
+
+        <!-- ================================== -->
+        <!-- 4 GÓC -->
+        <!-- ================================== -->
+
+        <section class="result-section">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        DOCUMENT DETECTION
+                    </p>
+
+                    <h2>
+                        Tọa độ 4 góc tài liệu
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+            <div class="corners-card">
+
+
+                {% if corners and corners|length == 4 %}
+
+                <div class="table-wrapper">
+
+                    <table class="corner-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Điểm
+                                </th>
+
+                                <th>
+                                    Vị trí
+                                </th>
+
+                                <th>
+                                    X
+                                </th>
+
+                                <th>
+                                    Y
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            <tr>
+
+                                <td>
+                                    P1
+                                </td>
+
+                                <td>
+                                    Top Left
+                                </td>
+
+                                <td>
+                                    {{ corners[0][0] }}
+                                </td>
+
+                                <td>
+                                    {{ corners[0][1] }}
+                                </td>
+
+                            </tr>
+
+
+                            <tr>
+
+                                <td>
+                                    P2
+                                </td>
+
+                                <td>
+                                    Top Right
+                                </td>
+
+                                <td>
+                                    {{ corners[1][0] }}
+                                </td>
+
+                                <td>
+                                    {{ corners[1][1] }}
+                                </td>
+
+                            </tr>
+
+
+                            <tr>
+
+                                <td>
+                                    P3
+                                </td>
+
+                                <td>
+                                    Bottom Right
+                                </td>
+
+                                <td>
+                                    {{ corners[2][0] }}
+                                </td>
+
+                                <td>
+                                    {{ corners[2][1] }}
+                                </td>
+
+                            </tr>
+
+
+                            <tr>
+
+                                <td>
+                                    P4
+                                </td>
+
+                                <td>
+                                    Bottom Left
+                                </td>
+
+                                <td>
+                                    {{ corners[3][0] }}
+                                </td>
+
+                                <td>
+                                    {{ corners[3][1] }}
+                                </td>
+
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+                {% else %}
+
+                <p>
+                    Không có dữ liệu tọa độ.
+                </p>
+
+                {% endif %}
+
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================================== -->
+        <!-- PIPELINE DESCRIPTION -->
+        <!-- ================================== -->
+
+        <section class="result-section">
+
+            <div class="pipeline-summary">
+
+                <div>
+
+                    <span class="summary-number">
+                        1
+                    </span>
+
+                    <strong>
+                        Canny
+                    </strong>
+
+                    <p>
+                        Gaussian → Gradient →
+                        NMS → Threshold →
+                        Hysteresis
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <span class="summary-number">
+                        2
+                    </span>
+
+                    <strong>
+                        Contour
+                    </strong>
+
+                    <p>
+                        Tìm contour lớn và
+                        xác định polygon 4 đỉnh.
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <span class="summary-number">
+                        3
+                    </span>
+
+                    <strong>
+                        Perspective
+                    </strong>
+
+                    <p>
+                        Nắn phối cảnh dựa
+                        trên bốn góc tài liệu.
+                    </p>
+
+                </div>
+
+
+                <div>
+
+                    <span class="summary-number">
+                        4
+                    </span>
+
+                    <strong>
+                        Sharpen
+                    </strong>
+
+                    <p>
+                        Unsharp Masking hoặc
+                        High Boost Filtering.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================================== -->
+        <!-- BOTTOM -->
+        <!-- ================================== -->
+
+        <div class="bottom-actions">
+
+            <a
+                href="{{ url_for('index') }}"
+                class="button-secondary"
+            >
+                ← Scan ảnh khác
+            </a>
+
+
+            <a
+                href="{{ url_for('static', filename=final_image) }}"
+                class="button-primary"
+                download
+            >
+                Tải ảnh kết quả
+            </a>
+
+        </div>
+
+
+    </main>
+
+</body>
+
+</html>
