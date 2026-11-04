@@ -1,853 +1,95 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
-
 <head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>
-        Document Scanner - Xử lý ảnh
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='css/style.css') }}"
-    >
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Quét tài liệu, nắn phối cảnh và so sánh thuật toán phát hiện biên trong một không gian làm việc.">
+  <title>DocuScan — Không gian xử lý tài liệu</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
-
-
 <body>
-
-    <main class="container">
-
-        <!-- ============================= -->
-        <!-- HEADER -->
-        <!-- ============================= -->
-
-        <header class="header">
-
-            <div>
-
-                <p class="eyebrow">
-                    XỬ LÝ ẢNH SỐ
-                </p>
-
-                <h1>
-                    Document Scanner
-                </h1>
-
-                <p class="subtitle">
-                    Phát hiện biên, xác định tài liệu,
-                    nắn phối cảnh và làm nét ảnh.
-                </p>
-
-            </div>
-
-
-            <div class="top-actions">
-
-                <a
-                    href="#compare"
-                    class="button-secondary"
-                >
-                    So sánh thuật toán
-                </a>
-
-            </div>
-
-        </header>
-
-
-        <!-- ============================= -->
-        <!-- HIỂN THỊ LỖI -->
-        <!-- ============================= -->
-
-        {% if error %}
-
-        <div class="alert-error">
-            {{ error }}
-        </div>
-
+{% set comparing = active_tab == 'compare' %}
+<svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="icon-scan" viewBox="0 0 24 24"><path d="M8 3H4a1 1 0 0 0-1 1v4m13-5h4a1 1 0 0 1 1 1v4M3 16v4a1 1 0 0 0 1 1h4m8 0h4a1 1 0 0 0 1-1v-4M7 12h10M8 8h8M8 16h8"/></symbol>
+  <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+  <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+  <symbol id="icon-file" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h6"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+</defs></svg>
+<header class="topbar">
+  <a href="{{ url_for('index') }}" class="brand" aria-label="DocuScan, trang chủ"><span class="brand-icon"><svg><use href="#icon-scan"/></svg></span>Docu<span class="brand-accent">Scan</span><span class="brand-tag">STUDIO</span></a>
+  <div class="topbar-note"><span class="status-dot"></span>Không gian xử lý ảnh</div>
+  <a href="#guide" class="help-link">Hướng dẫn sử dụng <span aria-hidden="true">↗</span></a>
+</header>
+<div class="app-layout">
+  <aside class="sidebar">
+    <p class="nav-label">KHÔNG GIAN LÀM VIỆC</p>
+    <nav aria-label="Chức năng chính">
+      <a href="/?tab=scan" class="nav-item {{ 'active' if not comparing else '' }}" {% if not comparing %}aria-current="page"{% endif %}><svg><use href="#icon-scan"/></svg>Quét tài liệu<span class="nav-arrow">↗</span></a>
+      <a href="/?tab=compare" class="nav-item {{ 'active' if comparing else '' }}" {% if comparing %}aria-current="page"{% endif %}><svg><use href="#icon-grid"/></svg>So sánh thuật toán</a>
+    </nav>
+    <div class="sidebar-tip"><span class="tip-icon">✦</span><h3>Một tấm ảnh.<br>Một tài liệu rõ nét.</h3><p>Chụp đủ bốn góc trang giấy trên nền tương phản để có kết quả tốt hơn.</p><a href="#guide">Xem hướng dẫn <span aria-hidden="true">→</span></a><div class="tip-lines" aria-hidden="true"><i></i><i></i><i></i><i></i></div></div>
+    <div class="sidebar-bottom"><svg><use href="#icon-file"/></svg><div>Document Scanner<small>Đồ án xử lý ảnh số · Đề 5</small></div></div>
+  </aside>
+  <main class="main-content" id="main">
+    <div class="breadcrumb">Không gian làm việc <span>/</span> <strong>{{ 'So sánh thuật toán' if comparing else 'Quét tài liệu' }}</strong></div>
+    <header class="page-heading"><div><p class="eyebrow">{{ 'KHÁM PHÁ TỪNG ĐƯỜNG BIÊN' if comparing else 'TỪ ẢNH CHỤP ĐẾN TÀI LIỆU' }}</p><h1>{{ 'So sánh thuật toán' if comparing else 'Tài liệu đẹp hơn, trong vài bước.' }}</h1><p>{{ 'Đặt sáu phương pháp phát hiện biên cạnh nhau và khám phá sự khác biệt.' if comparing else 'Tải ảnh lên, căn chỉnh trang giấy và làm rõ từng chi tiết.' }}</p></div><span class="workspace-badge"><span class="status-dot"></span>{{ '6 thuật toán' if comparing else 'Document Scanner' }}</span></header>
+    {% if error %}<div class="alert-error" role="alert"><strong>Chưa thể xử lý ảnh.</strong> {{ error }}</div>{% endif %}
+    <div class="workspace-grid">
+      <section class="panel upload-panel" aria-labelledby="upload-heading">
+        <div class="panel-heading"><span class="step-number">01</span><div><h2 id="upload-heading">{{ 'Ảnh cần so sánh' if comparing else 'Tải ảnh tài liệu' }}</h2><p>Bắt đầu với một bức ảnh của bạn</p></div><span class="small-label">ĐẦU VÀO</span></div>
+        <form id="processForm" action="{{ url_for('index', tab='compare' if comparing else 'scan') }}" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="{{ 'compare' if comparing else 'scan' }}">
+          <div class="upload-area" id="uploadArea">
+            <input type="file" id="imageInput" name="image" accept=".jpg,.jpeg,.png,.bmp,.webp" required aria-label="Chọn ảnh để xử lý" aria-describedby="uploadHint fileError">
+            <div class="upload-prompt" id="uploadPrompt"><div class="upload-symbol"><svg><use href="#icon-upload"/></svg></div><h3>Kéo và thả ảnh vào đây</h3><p>hoặc <span class="browse-text">chọn ảnh từ thiết bị</span></p><span class="format-label" id="uploadHint">JPG, PNG, BMP, WEBP · Tối đa 15 MB</span></div>
+            <div class="preview hidden" id="previewWrapper"><img id="imagePreview" alt="Ảnh đã chọn để xử lý"><span class="replace-hint">Nhấn để thay ảnh</span></div>
+          </div>
+          <div id="fileError" class="file-error hidden" role="alert"></div>
+          <div class="file-info hidden" id="fileInfo"><svg><use href="#icon-file"/></svg><span id="fileName"></span><span id="fileSize"></span><button type="button" id="removeFile" aria-label="Xóa ảnh đã chọn">×</button></div>
+          {% if not comparing %}
+          <div class="settings-heading"><svg><use href="#icon-grid"/></svg><h3>Tùy chỉnh làm nét</h3><span>SAU KHI CĂN CHỈNH</span></div>
+          <fieldset class="method-fieldset"><legend class="sr-only">Phương pháp làm nét</legend><div class="method-grid">
+            <label class="method-card"><input type="radio" name="sharpening_method" value="unsharp" {{ 'checked' if sharpening_method != 'highboost' else '' }}><div><strong>Unsharp Masking</strong><span>Tự nhiên, cân bằng chi tiết</span></div><span class="method-check" aria-hidden="true">✓</span></label>
+            <label class="method-card"><input type="radio" name="sharpening_method" value="highboost" {{ 'checked' if sharpening_method == 'highboost' else '' }}><div><strong>High Boost</strong><span>Tăng cường độ sắc nét</span></div><span class="method-check" aria-hidden="true">✓</span></label>
+          </div></fieldset>
+          <div class="strength-heading"><label for="strengthRange">Cường độ làm nét</label><output for="strengthRange" id="strengthValue">{{ sharpening_strength|default(1.0) }}</output></div>
+          <input type="range" id="strengthRange" name="sharpening_strength" min="0.5" max="3" step="0.1" value="{{ sharpening_strength|default(1.0) }}">
+          <div class="range-labels"><span id="rangeMinimum">Nhẹ · 0.5</span><span>Mạnh · 3.0</span></div>
+          {% else %}
+          <div class="comparison-methods"><h3>Các phương pháp được so sánh</h3><div>{% for name in ['Sobel', 'Prewitt', 'Laplacian', 'LoG', 'Canny tự cài', 'OpenCV Canny'] %}<span><svg><use href="#icon-check"/></svg>{{ name }}</span>{% endfor %}</div><p>Quan sát ảnh biên và thời gian thực thi trên cùng một ảnh đầu vào.</p></div>
+          {% endif %}
+          <button type="submit" class="button-primary submit-button" id="processButton"><svg><use href="#icon-{{ 'grid' if comparing else 'scan' }}"/></svg><span>{{ 'Chạy so sánh' if comparing else 'Quét tài liệu' }}</span><svg class="button-arrow"><use href="#icon-arrow"/></svg></button>
+          <p class="form-footnote" id="formFootnote">{{ 'Một ảnh đầu vào. Sáu góc nhìn khác nhau.' if comparing else 'Tự động phát hiện trang giấy và nắn chỉnh phối cảnh.' }}</p>
+          <div class="loading hidden" id="loading" role="status"><span class="spinner"></span><div><strong>Đang xử lý ảnh của bạn…</strong><p>Vui lòng giữ trang mở cho đến khi hoàn tất.</p></div></div>
+        </form>
+      </section>
+      <section class="panel preview-panel" aria-labelledby="result-heading">
+        <div class="panel-heading"><span class="step-number">02</span><div><h2 id="result-heading">{{ 'Tổng quan kết quả' if comparing else 'Bản quét của bạn' }}</h2><p>{{ 'Sẵn sàng khám phá các đường biên' if comparing else 'Căn thẳng. Rõ nét. Sẵn sàng sử dụng.' }}</p></div>{% if final_image or results %}<span class="complete-badge">Hoàn tất</span>{% else %}<span class="small-label">XEM TRƯỚC</span>{% endif %}</div>
+        {% if final_image %}
+        <div class="result-preview"><img src="{{ url_for('static', filename=final_image) }}" alt="Tài liệu sau khi nắn phối cảnh và làm nét"></div>
+        <div class="result-details"><span><strong>{{ width }} × {{ height }}</strong> px</span><span>{{ processing_time }} giây</span></div>
+        <a class="button-primary download-button" href="{{ url_for('static', filename=final_image) }}" download><svg><use href="#icon-download"/></svg>Tải bản quét JPG</a>
+        {% elif results %}
+        <div class="result-preview comparison-original"><img src="{{ url_for('static', filename=original_image) }}" alt="Ảnh gốc dùng để so sánh thuật toán"></div><div class="result-details"><span><strong>{{ width }} × {{ height }}</strong> px</span><span>{{ total_time }} giây</span></div><a class="button-secondary" href="#results">Xem kết quả 6 thuật toán <span>↓</span></a>
+        {% else %}
+        <div class="empty-preview"><div class="document-illustration" aria-hidden="true"><div class="scan-corner tl"></div><div class="scan-corner tr"></div><div class="scan-corner bl"></div><div class="scan-corner br"></div><div class="paper"><div class="paper-heading"></div><i></i><i></i><i></i><div class="paper-block"></div><i></i><i class="short"></i></div><div class="scan-line"></div><span class="paper-check"><svg><use href="#icon-check"/></svg></span></div><h3>{{ 'Mọi đường biên đều có câu chuyện' if comparing else 'Bản quét đẹp bắt đầu từ đây' }}</h3><p>{{ 'Tải ảnh lên để xem cách mỗi thuật toán nhận diện các chi tiết trong ảnh.' if comparing else 'Chọn ảnh bên trái. Tài liệu sau khi xử lý sẽ xuất hiện tại không gian này.' }}</p><span class="waiting-badge"><span></span>Đang chờ ảnh của bạn</span></div>
+        <div class="preview-footer"><svg><use href="#icon-check"/></svg>{{ 'So sánh trên cùng ảnh đầu vào' if comparing else 'Tự động căn chỉnh bốn góc tài liệu' }}</div>
         {% endif %}
-
-
-        <!-- ============================= -->
-        <nav class="dashboard-tabs"><button type="button" class="tab-button {% if active_tab != 'compare' %}active{% endif %}" data-tab="scan-panel">Scan tài liệu</button><button type="button" class="tab-button {% if active_tab == 'compare' %}active{% endif %}" data-tab="compare-panel">So sánh thuật toán</button></nav>
-        <section id="compare-panel" class="scanner-card tab-panel {% if active_tab != 'compare' %}hidden{% endif %}"><form action="/" method="POST" enctype="multipart/form-data"><input type="hidden" name="action" value="compare"><div class="form-section"><h2>So sánh thuật toán phát hiện biên</h2><p class="section-description">Sobel, Prewitt, Laplacian, LoG, Canny tự cài và OpenCV Canny.</p><label class="upload-box"><div class="upload-icon">↑</div><div class="upload-text"><strong>Chọn ảnh</strong><span>JPG, PNG, BMP hoặc WEBP</span></div><input type="file" name="image" accept="image/*" required></label></div><button class="scan-button" type="submit">Chạy so sánh</button></form></section>        <!-- FORM UPLOAD -->
-        <!-- ============================= -->
-
-        <section id="scan-panel" class="scanner-card tab-panel {% if active_tab == 'compare' %}hidden{% endif %}">
-
-            <form
-                id="scanForm"
-                action="/"
-                method="POST"
-                enctype="multipart/form-data"
-            >
-                <input type="hidden" name="action" value="scan">
-
-                <!-- ============================= -->
-                <!-- UPLOAD IMAGE -->
-                <!-- ============================= -->
-
-                <div class="form-section">
-
-                    <h2>
-                        1. Chọn ảnh tài liệu
-                    </h2>
-
-                    <p class="section-description">
-                        Hỗ trợ JPG, JPEG, PNG, BMP và WEBP.
-                        Dung lượng tối đa 15 MB.
-                    </p>
-
-
-                    <label
-                        for="imageInput"
-                        class="upload-box"
-                        id="uploadBox"
-                    >
-
-                        <div class="upload-icon">
-                            ↑
-                        </div>
-
-                        <div class="upload-text">
-
-                            <strong>
-                                Nhấn để chọn ảnh
-                            </strong>
-
-                            <span>
-                                hoặc kéo ảnh vào khu vực này
-                            </span>
-
-                        </div>
-
-                    </label>
-
-
-                    <input
-                        type="file"
-                        id="imageInput"
-                        name="image"
-                        accept=".jpg,.jpeg,.png,.bmp,.webp,image/*"
-                        required
-                        hidden
-                    >
-
-
-                    <!-- ============================= -->
-                    <!-- PREVIEW -->
-                    <!-- ============================= -->
-
-                    <div
-                        class="preview-wrapper hidden"
-                        id="previewWrapper"
-                    >
-
-                        <p class="preview-title">
-                            Ảnh đã chọn
-                        </p>
-
-                        <img
-                            id="imagePreview"
-                            class="image-preview"
-                            alt="Ảnh xem trước"
-                        >
-
-                        <div
-                            class="file-information"
-                            id="fileInformation"
-                        >
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ============================= -->
-                <!-- SHARPEN METHOD -->
-                <!-- ============================= -->
-
-                <div class="form-section">
-
-                    <h2>
-                        2. Phương pháp làm nét
-                    </h2>
-
-                    <p class="section-description">
-                        Chọn phương pháp xử lý ảnh sau khi
-                        nắn phối cảnh.
-                    </p>
-
-
-                    <div class="method-grid">
-
-                        <label class="method-card">
-
-                            <input
-                                type="radio"
-                                name="sharpening_method"
-                                value="unsharp"
-                                checked
-                            >
-
-                            <div class="method-content">
-
-                                <strong>
-                                    Unsharp Masking
-                                </strong>
-
-                                <span>
-                                    Làm nét cân bằng,
-                                    phù hợp tài liệu thông thường.
-                                </span>
-
-                            </div>
-
-                        </label>
-
-
-                        <label class="method-card">
-
-                            <input
-                                type="radio"
-                                name="sharpening_method"
-                                value="highboost"
-                            >
-
-                            <div class="method-content">
-
-                                <strong>
-                                    High Boost
-                                </strong>
-
-                                <span>
-                                    Khuếch đại chi tiết mạnh hơn,
-                                    phù hợp ảnh hơi mờ.
-                                </span>
-
-                            </div>
-
-                        </label>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ============================= -->
-                <!-- STRENGTH -->
-                <!-- ============================= -->
-
-                <div class="form-section">
-
-                    <h2>
-                        3. Cường độ làm nét
-                    </h2>
-
-
-                    <div class="range-row">
-
-                        <input
-                            type="range"
-                            id="strengthRange"
-                            name="sharpening_strength"
-                            min="0.5"
-                            max="3.0"
-                            step="0.1"
-                            value="1.0"
-                        >
-
-                        <span
-                            class="range-value"
-                            id="strengthValue"
-                        >
-                            1.0
-                        </span>
-
-                    </div>
-
-
-                    <div class="range-labels">
-
-                        <span>
-                            Nhẹ
-                        </span>
-
-                        <span>
-                            Mạnh
-                        </span>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ============================= -->
-                <!-- PIPELINE INFO -->
-                <!-- ============================= -->
-
-                <div class="pipeline-box">
-
-                    <h3>
-                        Quy trình xử lý
-                    </h3>
-
-
-                    <div class="pipeline">
-
-                        <div class="pipeline-item">
-
-                            <span>
-                                1
-                            </span>
-
-                            Canny
-
-                        </div>
-
-
-                        <div class="pipeline-arrow">
-                            →
-                        </div>
-
-
-                        <div class="pipeline-item">
-
-                            <span>
-                                2
-                            </span>
-
-                            Phát hiện tài liệu
-
-                        </div>
-
-
-                        <div class="pipeline-arrow">
-                            →
-                        </div>
-
-
-                        <div class="pipeline-item">
-
-                            <span>
-                                3
-                            </span>
-
-                            Perspective
-
-                        </div>
-
-
-                        <div class="pipeline-arrow">
-                            →
-                        </div>
-
-
-                        <div class="pipeline-item">
-
-                            <span>
-                                4
-                            </span>
-
-                            Sharpen
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ============================= -->
-                <!-- SUBMIT -->
-                <!-- ============================= -->
-
-                <button
-                    type="submit"
-                    class="scan-button"
-                    id="scanButton"
-                >
-                    Bắt đầu Scan
-                </button>
-
-
-                <!-- ============================= -->
-                <!-- LOADING -->
-                <!-- ============================= -->
-
-                <div
-                    class="loading hidden"
-                    id="loading"
-                >
-
-                    <div class="spinner">
-                    </div>
-
-                    <div>
-
-                        <strong>
-                            Đang xử lý ảnh...
-                        </strong>
-
-                        <p>
-                            Canny tự cài đặt đang phân tích
-                            ảnh tài liệu.
-                        </p>
-
-                    </div>
-
-                </div>
-
-            </form>
-
-        </section>
-
-
-        <!-- ============================= -->
-        <!-- FEATURE INFO -->
-        <!-- ============================= -->
-
-        <section class="result-section">
-
-            <div class="section-heading">
-
-                <div>
-
-                    <p class="eyebrow">
-                        CHỨC NĂNG
-                    </p>
-
-                    <h2>
-                        Hệ thống hiện có
-                    </h2>
-
-                </div>
-
-            </div>
-
-
-            <div class="pipeline-summary">
-
-
-                <div>
-
-                    <span class="summary-number">
-                        1
-                    </span>
-
-                    <strong>
-                        Document Scanner
-                    </strong>
-
-                    <p>
-                        Phát hiện 4 góc tài liệu,
-                        nắn phối cảnh và làm nét.
-                    </p>
-
-                </div>
-
-
-                <div>
-
-                    <span class="summary-number">
-                        2
-                    </span>
-
-                    <strong>
-                        Canny tự cài
-                    </strong>
-
-                    <p>
-                        Gaussian, Sobel Gradient,
-                        NMS, Double Threshold và Hysteresis.
-                    </p>
-
-                </div>
-
-
-                <div>
-
-                    <span class="summary-number">
-                        3
-                    </span>
-
-                    <strong>
-                        Sharpening
-                    </strong>
-
-                    <p>
-                        Hỗ trợ Unsharp Masking
-                        và High Boost Filtering.
-                    </p>
-
-                </div>
-
-
-                <div>
-
-                    <span class="summary-number">
-                        4
-                    </span>
-
-                    <strong>
-                        Compare Algorithms
-                    </strong>
-
-                    <p>
-                        So sánh Sobel, Prewitt,
-                        Laplacian, LoG và Canny.
-                    </p>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-    {% if results %}<section class="result-section"><h2>Kết quả so sánh</h2><div class="result-grid">{% for item in results %}<article class="result-card"><div class="result-card-header"><h3>{{ item.name }} · {{ item.time }}s</h3></div><div class="result-image-wrapper"><img class="result-image" src="{{ url_for('static', filename=item.image) }}" alt="{{ item.name }}"></div></article>{% endfor %}</div></section>{% endif %}
-    {% if final_image %}<section class="result-section"><h2>Kết quả scan</h2><div class="result-grid"><article class="result-card"><h3>Ảnh gốc</h3><img class="result-image" src="{{ url_for('static', filename=original_image) }}" alt="Ảnh gốc"></article><article class="result-card"><h3>Canny</h3><img class="result-image" src="{{ url_for('static', filename=edge_image) }}" alt="Canny"></article><article class="result-card"><h3>Detection</h3><img class="result-image" src="{{ url_for('static', filename=detection_image) }}" alt="Detection"></article><article class="result-card"><h3>Perspective</h3><img class="result-image" src="{{ url_for('static', filename=perspective_image) }}" alt="Perspective"></article></div><h3>Final result</h3><img class="final-image" src="{{ url_for('static', filename=final_image) }}" alt="Kết quả cuối"><a class="button-primary" href="{{ url_for('static', filename=final_image) }}" download>Tải ảnh</a></section>{% endif %}    </main>
-
-
-    <!-- ============================= -->
-    <!-- JAVASCRIPT -->
-    <!-- ============================= -->
-
-    <script>
-
-        const imageInput =
-            document.getElementById(
-                "imageInput"
-            );
-
-        const imagePreview =
-            document.getElementById(
-                "imagePreview"
-            );
-
-        const previewWrapper =
-            document.getElementById(
-                "previewWrapper"
-            );
-
-        const fileInformation =
-            document.getElementById(
-                "fileInformation"
-            );
-
-        const strengthRange =
-            document.getElementById(
-                "strengthRange"
-            );
-
-        const strengthValue =
-            document.getElementById(
-                "strengthValue"
-            );
-
-        const scanForm =
-            document.getElementById(
-                "scanForm"
-            );
-
-        const scanButton =
-            document.getElementById(
-                "scanButton"
-            );
-
-        const loading =
-            document.getElementById(
-                "loading"
-            );
-
-        const uploadBox =
-            document.getElementById(
-                "uploadBox"
-            );
-
-
-        // ======================================
-        // PREVIEW ẢNH
-        // ======================================
-
-        imageInput.addEventListener(
-            "change",
-            function () {
-
-                const file =
-                    imageInput.files[0];
-
-
-                if (!file) {
-
-                    previewWrapper
-                        .classList
-                        .add(
-                            "hidden"
-                        );
-
-                    return;
-                }
-
-
-                // Kiểm tra dung lượng phía client
-                const maxSize =
-                    15 * 1024 * 1024;
-
-
-                if (
-                    file.size > maxSize
-                ) {
-
-                    alert(
-                        "Ảnh vượt quá 15 MB."
-                    );
-
-                    imageInput.value =
-                        "";
-
-                    previewWrapper
-                        .classList
-                        .add(
-                            "hidden"
-                        );
-
-                    return;
-                }
-
-
-                const reader =
-                    new FileReader();
-
-
-                reader.onload =
-                    function (event) {
-
-                        imagePreview.src =
-                            event.target.result;
-
-
-                        previewWrapper
-                            .classList
-                            .remove(
-                                "hidden"
-                            );
-
-                    };
-
-
-                reader.readAsDataURL(
-                    file
-                );
-
-
-                const fileSizeMB =
-                    (
-                        file.size
-                        / 1024
-                        / 1024
-                    ).toFixed(2);
-
-
-                fileInformation.innerHTML =
-                    `
-                        <span>
-                            ${file.name}
-                        </span>
-
-                        <span>
-                            ${fileSizeMB} MB
-                        </span>
-                    `;
-
-            }
-        );
-
-
-        // ======================================
-        // STRENGTH RANGE
-        // ======================================
-
-        strengthRange.addEventListener(
-            "input",
-            function () {
-
-                strengthValue.textContent =
-                    Number(
-                        strengthRange.value
-                    ).toFixed(1);
-
-            }
-        );
-
-
-        // ======================================
-        // LOADING KHI SUBMIT
-        // ======================================
-
-        scanForm.addEventListener(
-            "submit",
-            function (event) {
-
-                if (
-                    !imageInput.files[0]
-                ) {
-
-                    event.preventDefault();
-
-                    alert(
-                        "Hãy chọn ảnh trước khi scan."
-                    );
-
-                    return;
-                }
-
-
-                scanButton.disabled =
-                    true;
-
-
-                scanButton.textContent =
-                    "Đang xử lý...";
-
-
-                loading
-                    .classList
-                    .remove(
-                        "hidden"
-                    );
-
-            }
-        );
-
-
-        // ======================================
-        // DRAG OVER
-        // ======================================
-
-        uploadBox.addEventListener(
-            "dragover",
-            function (event) {
-
-                event.preventDefault();
-
-
-                uploadBox
-                    .classList
-                    .add(
-                        "dragging"
-                    );
-
-            }
-        );
-
-
-        // ======================================
-        // DRAG LEAVE
-        // ======================================
-
-        uploadBox.addEventListener(
-            "dragleave",
-            function () {
-
-                uploadBox
-                    .classList
-                    .remove(
-                        "dragging"
-                    );
-
-            }
-        );
-
-
-        // ======================================
-        // DROP FILE
-        // ======================================
-
-        uploadBox.addEventListener(
-            "drop",
-            function (event) {
-
-                event.preventDefault();
-
-
-                uploadBox
-                    .classList
-                    .remove(
-                        "dragging"
-                    );
-
-
-                const files =
-                    event.dataTransfer.files;
-
-
-                if (
-                    files.length === 0
-                ) {
-                    return;
-                }
-
-
-                const firstFile =
-                    files[0];
-
-
-                if (
-                    !firstFile.type
-                        .startsWith(
-                            "image/"
-                        )
-                ) {
-
-                    alert(
-                        "File được chọn không phải ảnh."
-                    );
-
-                    return;
-                }
-
-
-                const dataTransfer =
-                    new DataTransfer();
-
-
-                dataTransfer.items.add(
-                    firstFile
-                );
-
-
-                imageInput.files =
-                    dataTransfer.files;
-
-
-                imageInput.dispatchEvent(
-                    new Event(
-                        "change"
-                    )
-                );
-
-            }
-        );
-
-    </script>
-
-<script>document.querySelectorAll(".tab-button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab-button").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab-panel").forEach(p=>{p.classList.add("hidden");p.querySelectorAll("input,select,textarea,button").forEach(c=>c.disabled=true)});b.classList.add("active");const panel=document.getElementById(b.dataset.tab);panel.classList.remove("hidden");panel.querySelectorAll("input,select,textarea,button").forEach(c=>c.disabled=false)}));document.querySelectorAll(".tab-panel").forEach(p=>{const active=!p.classList.contains("hidden");p.querySelectorAll("input,select,textarea,button").forEach(c=>c.disabled=!active)});</script>
-
+      </section>
+    </div>
+    {% if results or final_image %}
+    <section class="results-section" id="results"><div class="section-heading"><div><p class="eyebrow">{{ 'SÁU PHƯƠNG PHÁP · MỘT ẢNH ĐẦU VÀO' if results else 'TỪNG BƯỚC XỬ LÝ' }}</p><h2>{{ 'Khám phá kết quả phát hiện biên' if results else 'Từ ảnh gốc đến bản quét' }}</h2></div><span class="small-label">{{ '6 kết quả' if results else '4 giai đoạn' }}</span></div><div class="result-grid">
+      {% if results %}{% for item in results %}<article class="result-card"><div class="result-card-heading"><h3>{{ item.name }}</h3><span>{{ item.time }} s</span></div><a href="{{ url_for('static', filename=item.image) }}" target="_blank" rel="noopener" aria-label="Mở ảnh {{ item.name }} đầy đủ"><img loading="lazy" src="{{ url_for('static', filename=item.image) }}" alt="Biên ảnh do {{ item.name }} phát hiện"></a><a class="result-download" href="{{ url_for('static', filename=item.image) }}" download>Tải ảnh biên <svg><use href="#icon-download"/></svg></a></article>{% endfor %}
+      {% else %}{% for title, image in [('Ảnh gốc', original_image), ('Phát hiện biên', edge_image), ('Xác định trang giấy', detection_image), ('Nắn phối cảnh', perspective_image)] %}<article class="result-card"><div class="result-card-heading"><h3><span class="stage-number">0{{ loop.index }}</span>{{ title }}</h3></div><a href="{{ url_for('static', filename=image) }}" target="_blank" rel="noopener" aria-label="Mở ảnh {{ title }} đầy đủ"><img loading="lazy" src="{{ url_for('static', filename=image) }}" alt="{{ title }}"></a></article>{% endfor %}{% endif %}
+    </div></section>
+    {% endif %}
+    <section class="guide-section" id="guide"><div class="section-heading"><div><p class="eyebrow">ĐƠN GIẢN TỪ ĐẦU ĐẾN CUỐI</p><h2>Ba bước đến kết quả tốt hơn</h2></div><span class="guide-note">Một vài gợi ý nhỏ cho ảnh đầu vào</span></div><div class="guide-grid"><article><span>01</span><div><h3>Chụp trọn trang giấy</h3><p>Để đủ bốn góc trong khung hình, chọn nền khác màu với tài liệu.</p></div></article><article><span>02</span><div><h3>Chọn độ nét phù hợp</h3><p>Dùng Unsharp cho nét tự nhiên; High Boost khi cần tăng cường chi tiết.</p></div></article><article><span>03</span><div><h3>Xem và lưu kết quả</h3><p>Kiểm tra bản quét, xem từng bước xử lý và tải ảnh về thiết bị.</p></div></article></div></section>
+    <footer class="page-footer"><span>DocuScan Studio <span class="footer-divider">/</span> Xử lý ảnh số</span><span>Được xây dựng để mỗi trang giấy rõ ràng hơn.</span></footer>
+  </main>
+</div>
 </body>
-
 </html>
-
-
-
-
-
-

@@ -133,11 +133,12 @@ def double_threshold(
     )
 
     strong_y, strong_x = np.where(
-        image >= high_threshold
+        (image > 0) & (image >= high_threshold)
     )
 
     weak_y, weak_x = np.where(
         (image >= low_threshold)
+        & (image > 0)
         & (image < high_threshold)
     )
 

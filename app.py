@@ -329,7 +329,8 @@ def index() -> str | tuple[str, int]:
     if request.method == "POST":
         action = request.form.get("action", "scan")
         return scan() if action == "scan" else compare()
-    return render_template("index.html", active_tab="scan")
+    active_tab = "compare" if request.args.get("tab") == "compare" else "scan"
+    return render_template("index.html", active_tab=active_tab)
 
 
 # ============================================================
@@ -998,9 +999,7 @@ def file_too_large(
     )
 
 
-    if request.path.startswith(
-        "/compare"
-    ):
+    if request.args.get("tab") == "compare":
 
         return (
             render_template(

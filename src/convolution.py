@@ -47,6 +47,8 @@ def convolution2d(image, kernel, padding="reflect"):
     # Chuyển sang float32 để tránh tràn số uint8
     image = image.astype(np.float32)
     kernel = kernel.astype(np.float32)
+    # Mathematical convolution flips the kernel along both axes.
+    kernel = np.flip(kernel, axis=(0, 1))
 
     # Tính số pixel cần padding
     pad_h = kh // 2
