@@ -1,4 +1,5 @@
 import numpy as np
+from collections import deque
 
 from src.convolution import convolution2d
 from src.sobel import to_grayscale
@@ -35,43 +36,24 @@ def non_maximum_suppression(magnitude, direction):
 
     angle[angle < 0] += 180
 
-    for y in range(1, height - 1):
-        for x in range(1, width - 1):
-
-            current = magnitude[y, x]
-
-            neighbor1 = 0
-            neighbor2 = 0
-
-            # Hướng 0 độ
-            if (
-                0 <= angle[y, x] < 22.5
-                or 157.5 <= angle[y, x] <= 180
-            ):
-                neighbor1 = magnitude[y, x - 1]
-                neighbor2 = magnitude[y, x + 1]
-
-            # Hướng 45 độ
-            elif 22.5 <= angle[y, x] < 67.5:
-                neighbor1 = magnitude[y - 1, x + 1]
-                neighbor2 = magnitude[y + 1, x - 1]
-
-            # Hướng 90 độ
-            elif 67.5 <= angle[y, x] < 112.5:
-                neighbor1 = magnitude[y - 1, x]
-                neighbor2 = magnitude[y + 1, x]
-
-            # Hướng 135 độ
-            elif 112.5 <= angle[y, x] < 157.5:
-                neighbor1 = magnitude[y - 1, x - 1]
-                neighbor2 = magnitude[y + 1, x + 1]
-
-            # Chỉ giữ local maximum
-            if (
-                current >= neighbor1
-                and current >= neighbor2
-            ):
-                output[y, x] = current
+    current = magnitude[1:-1, 1:-1]
+    inner_angle = angle[1:-1, 1:-1]
+    # Preserve all four direction bins, diagonal conventions, ties and borders.
+    directions = (
+        (((inner_angle >= 0) & (inner_angle < 22.5))
+         | ((inner_angle >= 157.5) & (inner_angle <= 180)),
+         magnitude[1:-1, :-2], magnitude[1:-1, 2:]),
+        ((inner_angle >= 22.5) & (inner_angle < 67.5),
+         magnitude[:-2, 2:], magnitude[2:, :-2]),
+        ((inner_angle >= 67.5) & (inner_angle < 112.5),
+         magnitude[:-2, 1:-1], magnitude[2:, 1:-1]),
+        ((inner_angle >= 112.5) & (inner_angle < 157.5),
+         magnitude[:-2, :-2], magnitude[2:, 2:]),
+    )
+    keep = current >= 0
+    for mask, neighbor1, neighbor2 in directions:
+        keep[mask] = (current[mask] >= neighbor1[mask]) & (current[mask] >= neighbor2[mask])
+    output[1:-1, 1:-1] = np.where(keep, current, 0)
 
     return output
 
@@ -182,31 +164,37 @@ def hysteresis(
 
     height, width = result.shape
 
-    changed = True
-
-    while changed:
-        changed = False
-
-        for y in range(1, height - 1):
-            for x in range(1, width - 1):
-
-                if result[y, x] == weak_value:
-
-                    region = result[
-                        y - 1:y + 2,
-                        x - 1:x + 2
-                    ]
-
-                    if np.any(
-                        region == strong_value
-                    ):
-                        result[y, x] = strong_value
-                        changed = True
-
-    # Các weak edge còn lại bị loại
-    result[
-        result != strong_value
-    ] = 0
+    strong = result == strong_value
+    weak = result == weak_value
+    # The original loop never promotes border pixels, even when connected.
+    if height > 2 and width > 2:
+        weak[0, :] = weak[-1, :] = False
+        weak[:, 0] = weak[:, -1] = False
+        adjacent = np.zeros((height - 2, width - 2), dtype=bool)
+        for dy in range(3):
+            for dx in range(3):
+                if dy != 1 or dx != 1:
+                    adjacent |= strong[dy:dy + height - 2, dx:dx + width - 2]
+        seeds = np.zeros_like(strong)
+        seeds[1:-1, 1:-1] = weak[1:-1, 1:-1] & adjacent
+        pending = deque(np.flatnonzero(seeds).tolist())
+        strong_flat = strong.reshape(-1)
+        weak_flat = weak.reshape(-1)
+        strong_flat[seeds.reshape(-1)] = True
+        weak_flat[seeds.reshape(-1)] = False
+        offsets = (-width - 1, -width, -width + 1, -1, 1, width - 1, width, width + 1)
+        # Each connected weak pixel is visited once instead of rescanning
+        # every pixel until an entire weak chain has propagated.
+        while pending:
+            current = pending.popleft()
+            for offset in offsets:
+                neighbor = current + offset
+                if weak_flat[neighbor]:
+                    weak_flat[neighbor] = False
+                    strong_flat[neighbor] = True
+                    pending.append(neighbor)
+    result[strong] = strong_value
+    result[~strong] = 0
 
     return result
 

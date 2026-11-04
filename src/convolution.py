@@ -72,19 +72,17 @@ def convolution2d(image, kernel, padding="reflect"):
 
     height, width = image.shape
 
-    # Quét qua từng pixel
-    for y in range(height):
-        for x in range(width):
+    if height == 0 or width == 0:
+        return output
 
-            # Lấy vùng ảnh có kích thước bằng kernel
-            region = padded[
-                y:y + kh,
-                x:x + kw
-            ]
-
-            # Nhân từng phần tử và cộng lại
-            output[y, x] = np.sum(
-                region * kernel
-            )
+    # Keep the same float32 products and reduction order as the scalar version.
+    # Sliding windows are views; only a bounded block of products is allocated.
+    windows = np.lib.stride_tricks.sliding_window_view(padded, (kh, kw))
+    rows_per_block = max(1, (16 * 1024 * 1024) // (width * kh * kw * image.itemsize))
+    for start in range(0, height, rows_per_block):
+        stop = min(start + rows_per_block, height)
+        products = np.empty((stop - start, width, kh, kw), dtype=np.float32)
+        np.multiply(windows[start:stop], kernel, out=products)
+        output[start:stop] = products.reshape(stop - start, width, kh * kw).sum(axis=-1)
 
     return output

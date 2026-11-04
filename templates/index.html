@@ -28,6 +28,10 @@
   <aside class="sidebar">
     <p class="nav-label">KHÔNG GIAN LÀM VIỆC</p>
     <nav aria-label="Chức năng chính">
+      <a href="{{ url_for('multipage.multipage_page') }}"
+        class="nav-item">
+          📄 Quét nhiều trang / Xuất PDF
+      </a>
       <a href="/?tab=scan" class="nav-item {{ 'active' if not comparing else '' }}" {% if not comparing %}aria-current="page"{% endif %}><svg><use href="#icon-scan"/></svg>Quét tài liệu<span class="nav-arrow">↗</span></a>
       <a href="/?tab=compare" class="nav-item {{ 'active' if comparing else '' }}" {% if comparing %}aria-current="page"{% endif %}><svg><use href="#icon-grid"/></svg>So sánh thuật toán</a>
     </nav>

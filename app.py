@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import time
 import uuid
@@ -12,6 +12,8 @@ from werkzeug.datastructures import FileStorage
 
 from src.comparison import compare_algorithms
 from src.scanner import scan_document
+from multipage import multipage_bp
+
 
 
 # ============================================================
@@ -19,7 +21,7 @@ from src.scanner import scan_document
 # ============================================================
 
 app = Flask(__name__)
-
+app.register_blueprint(multipage_bp)
 
 # ============================================================
 # PROJECT PATHS
@@ -50,9 +52,8 @@ RESULT_FOLDER.mkdir(
 # ============================================================
 
 # Tối đa 15 MB / file
-app.config["MAX_CONTENT_LENGTH"] = (
-    15 * 1024 * 1024
-)
+# Giới hạn tổng request, bao gồm nhiều trang
+app.config["MAX_CONTENT_LENGTH"] = 80 * 1024 * 1024
 
 
 ALLOWED_EXTENSIONS = {

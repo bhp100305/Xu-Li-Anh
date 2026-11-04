@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DocuScan · Quét tài liệu</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/capture.css') }}">
+  <script src="{{ url_for('static', filename='js/multipage.js') }}" defer></script>
+</head>
+<body>
+  <header class="app-header"><a class="brand" href="/">Docu<span>Scan</span><small>STUDIO</small></a><a href="/">← Không gian làm việc</a></header>
+  <main class="library" id="library">
+    <div class="library-heading"><div><p class="eyebrow">TỪ TỜ GIẤY ĐẾN TÀI LIỆU</p><h1>Từng trang, thật rõ ràng.</h1><p>Bấm chụp để tự động scan, tiếp tục quét rồi lưu thành PDF.</p></div><span class="private-note">Ảnh được giữ trong phiên làm việc</span></div>
+    <section class="add-panel">
+      <div class="add-symbol" aria-hidden="true">＋</div><div><h2>Thêm trang tài liệu</h2><p>Đặt giấy trên nền tương phản, giữ đủ bốn góc trong khung hình.</p></div>
+      <div class="library-actions"><button class="primary" id="openCamera">Mở máy quét <span aria-hidden="true">↗</span></button><label class="secondary" for="imageFiles">Chọn ảnh</label></div>
+      <input id="imageFiles" type="file" accept="image/*" multiple hidden>
+      <input id="nativeCameraInput" type="file" accept="image/*" capture="environment" hidden>
+    </section>
+    <div class="pages-heading"><div><p class="eyebrow">TÀI LIỆU CỦA BẠN</p><h2>Các trang đã quét <span id="pageCount">0 trang</span></h2></div><button class="text-button" id="clearPages">Xóa tất cả</button></div>
+    <p class="page-view-hint">Bấm vào ảnh của từng trang để mở xem rõ hơn.</p>
+    <div id="emptyState"><div class="empty-paper" aria-hidden="true"><span></span><i></i><i></i><i></i></div><h3>Bắt đầu từ một trang giấy</h3><p>Mở máy quét hoặc chọn ảnh có sẵn để tạo tài liệu đầu tiên.</p></div>
+    <div id="pageGrid" class="page-grid"></div>
+    <p id="status" class="library-status" role="status" aria-live="polite">Sẵn sàng quét tài liệu.</p>
+    <footer class="export-bar"><span>Sắp xếp các trang theo thứ tự bạn muốn.</span><button class="primary" id="exportPdf" disabled>Xuất PDF <span aria-hidden="true">↓</span></button></footer>
+  </main>
+
+  <section id="scanner" class="scanner" role="dialog" aria-modal="true" aria-labelledby="scannerTitle" hidden>
+    <header class="scanner-toolbar">
+      <button class="icon-button" id="closeScanner" aria-label="Đóng máy quét">✕</button>
+      <h2 id="scannerTitle">Quét tài liệu</h2>
+      <div class="toolbar-tools"><button class="icon-button" id="torchButton" aria-label="Bật đèn camera" aria-pressed="false" disabled>ϟ</button><button id="nativeCameraButton" class="hd-label" aria-label="Chụp HD bằng camera điện thoại" title="Chụp bằng camera điện thoại để giữ nhiều chi tiết hơn">HD</button><button class="icon-button" id="switchCamera" aria-label="Đổi camera">⇄</button></div>
+    </header>
+    <div id="cameraStage" class="camera-stage">
+      <div id="imageSurface" class="image-surface">
+        <video id="camera" autoplay playsinline muted></video>
+        <canvas id="captureCanvas" role="img" aria-label="Ảnh tài liệu vừa chụp" hidden></canvas>
+        <svg id="cornerOverlay" class="corner-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true" hidden>
+          <path id="outsideMask" fill="rgba(0,0,0,.44)" fill-rule="evenodd"></path>
+          <polygon id="documentPolygon" fill="rgba(36,215,186,.15)" stroke="#24d7ba" stroke-width="3" vector-effect="non-scaling-stroke"></polygon>
+        </svg>
+        <div id="cameraGuide" class="camera-guide" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <p id="cameraHint" class="camera-hint" role="status" aria-live="polite">Đặt tài liệu vào khung hình</p>
+    </div>
+    <div id="cameraActions" class="capture-controls">
+      <p class="active-tool">Quét <span></span></p>
+      <div class="shutter-row"><button class="icon-button gallery-button" id="chooseImage" aria-label="Chọn ảnh từ thiết bị">▦</button><button class="shutter" id="captureButton" aria-label="Chụp và tự động scan" disabled><span></span></button><button class="thumbnail-button" id="showPages" aria-label="Xem các trang đã quét"><img id="lastPage" alt="" hidden><span id="capturedCount">0</span></button></div>
+      <p class="capture-note">Giữ máy ổn định · Chạm HD để chụp bằng camera điện thoại</p>
+    </div>
+    <div id="captureReview" class="review-controls" hidden>
+      <div class="review-heading"><span id="captureHeading">Ảnh gốc chưa scan thành công</span></div>
+      <div class="review-actions"><button id="retakePhoto" class="secondary">Chụp lại</button><button id="scanCapture" class="primary" disabled>Thử scan lại <span aria-hidden="true">↻</span></button></div>
+      <a id="saveCapture" class="save-photo" hidden download>Lưu ảnh gốc ↓</a>
+    </div>
+  </section>
+
+  <section id="pageViewer" class="page-viewer" role="dialog" aria-modal="true" aria-labelledby="viewerTitle" hidden>
+    <header class="viewer-toolbar">
+      <button class="icon-button" id="closeViewer" aria-label="Đóng ảnh">✕</button>
+      <h2 id="viewerTitle">Ảnh đã quét</h2>
+      <div class="viewer-tools">
+        <button id="zoomViewer" aria-pressed="false" aria-label="Xem ảnh ở kích thước gốc">100%</button>
+        <a id="downloadPage" download>Tải ảnh ↓</a>
+      </div>
+    </header>
+    <div id="viewerBody" class="viewer-body" tabindex="0" aria-label="Ảnh đã quét; dùng nút 100% để phóng to và cuộn xem chi tiết">
+      <img id="viewerImage" alt="Ảnh tài liệu đã quét">
+    </div>
+    <nav class="viewer-navigation" aria-label="Chuyển trang đã quét">
+      <button id="previousPage" aria-label="Xem trang trước">← Trang trước</button>
+      <span id="viewerCount" aria-live="polite"></span>
+      <button id="nextPage" aria-label="Xem trang sau">Trang sau →</button>
+    </nav>
+  </section>
+</body>
+</html>
