@@ -60,14 +60,28 @@
       <button class="icon-button" id="closeViewer" aria-label="Đóng ảnh">✕</button>
       <h2 id="viewerTitle">Ảnh đã quét</h2>
       <div class="viewer-tools">
+        <button id="editCrop">Chỉnh 4 góc</button>
         <button id="zoomViewer" aria-pressed="false" aria-label="Xem ảnh ở kích thước gốc">100%</button>
         <a id="downloadPage" download>Tải ảnh ↓</a>
       </div>
     </header>
+    <p id="viewerMessage" class="viewer-message" role="status" aria-live="polite" hidden></p>
     <div id="viewerBody" class="viewer-body" tabindex="0" aria-label="Ảnh đã quét; dùng nút 100% để phóng to và cuộn xem chi tiết">
       <img id="viewerImage" alt="Ảnh tài liệu đã quét">
+      <div id="cropSurface" class="crop-surface" hidden>
+        <img id="cropImage" alt="Ảnh gốc để chọn lại bốn góc tài liệu" draggable="false">
+        <svg class="corner-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
+          <path id="cropMask" fill="rgba(0,0,0,.55)" fill-rule="evenodd"></path>
+          <polygon id="cropPolygon" fill="rgba(36,215,186,.10)" stroke="#24d7ba" stroke-width="3" vector-effect="non-scaling-stroke"></polygon>
+        </svg>
+        <div id="cropHandles" class="corner-handles"></div>
+      </div>
     </div>
-    <nav class="viewer-navigation" aria-label="Chuyển trang đã quét">
+    <div id="cropActions" class="crop-actions" hidden>
+      <p>Kéo 4 góc vào mép tài liệu. Dùng phím mũi tên để chỉnh chính xác.</p>
+      <div><button id="cancelCrop">Hủy</button><button id="selectWholeImage">Toàn bộ ảnh</button><button id="applyCrop">Nắn lại ảnh</button></div>
+    </div>
+    <nav id="viewerNavigation" class="viewer-navigation" aria-label="Chuyển trang đã quét">
       <button id="previousPage" aria-label="Xem trang trước">← Trang trước</button>
       <span id="viewerCount" aria-live="polite"></span>
       <button id="nextPage" aria-label="Xem trang sau">Trang sau →</button>

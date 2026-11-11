@@ -11,6 +11,7 @@ from src.log_detector import log_detector
 from src.prewitt import prewitt
 from src.sobel import sobel
 from src.sobel import to_grayscale
+from src.scanner import scan_document
 
 
 def resize_for_comparison(
@@ -151,6 +152,7 @@ def run_with_timer(
 def compare_algorithms(
     image: np.ndarray,
     max_width: int = 700,
+    include_scans: bool = False,
 ) -> dict[str, object]:
     """
     So sánh các thuật toán phát hiện biên.
@@ -169,6 +171,9 @@ def compare_algorithms(
 
         max_width:
             Chiều rộng tối đa để xử lý.
+
+        include_scans:
+            Dùng ảnh biên của từng thuật toán để tìm giấy và tạo bản quét.
 
     Returns:
         Dictionary chứa ảnh kết quả
@@ -376,6 +381,25 @@ def compare_algorithms(
         },
     }
 
+
+    if include_scans:
+        for data in results.values():
+            scan_start = time.perf_counter()
+            # Gradient detectors return intensity maps, while Canny/LoG
+            # return binary edges. Otsu preserves binary maps and gives the
+            # common paper detector a binary map for every algorithm.
+            _, binary = cv2.threshold(data["edge"], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            data["detection_edge"] = binary
+            try:
+                data["scan"] = scan_document(
+                    image=image, detection_width=max_width, output_width=1000,
+                    verbose=False, edge_image=binary,
+                )
+                data["scan_error"] = None
+            except (ValueError, RuntimeError, cv2.error) as error:
+                data["scan"] = None
+                data["scan_error"] = str(error) or "Chưa xác định được vùng giấy."
+            data["scan_time"] = time.perf_counter() - scan_start
 
     return {
         "original": working_image,

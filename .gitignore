@@ -12,3 +12,7 @@ __pycache__/
 !.env.example
 .DS_Store
 Thumbs.db
+
+# Local review artifacts containing user-supplied photographs.
+/docs/corrected-exam-scan.png
+/docs/browser-crop-review/

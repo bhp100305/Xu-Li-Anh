@@ -1,6 +1,6 @@
-"""Compare optimized kernels with the original scalar implementation.
+"""Compare vectorized kernels with independent scalar calculations.
 
-The scalar references deliberately retain the old traversal and sum order.
+Convolution retains the old sum order; NMS follows image-coordinate geometry.
 """
 import importlib
 import unittest
@@ -10,6 +10,7 @@ import numpy as np
 
 from src.convolution import convolution2d
 from src.canny import canny, hysteresis, non_maximum_suppression
+from src.log_detector import zero_crossing
 
 
 def scalar_convolution(image, kernel, padding='reflect'):
@@ -34,11 +35,11 @@ def scalar_nms(magnitude, direction):
             if 0 <= angle[y, x] < 22.5 or 157.5 <= angle[y, x] <= 180:
                 a, b = magnitude[y, x - 1], magnitude[y, x + 1]
             elif 22.5 <= angle[y, x] < 67.5:
-                a, b = magnitude[y - 1, x + 1], magnitude[y + 1, x - 1]
+                a, b = magnitude[y - 1, x - 1], magnitude[y + 1, x + 1]
             elif 67.5 <= angle[y, x] < 112.5:
                 a, b = magnitude[y - 1, x], magnitude[y + 1, x]
             elif 112.5 <= angle[y, x] < 157.5:
-                a, b = magnitude[y - 1, x - 1], magnitude[y + 1, x + 1]
+                a, b = magnitude[y - 1, x + 1], magnitude[y + 1, x - 1]
             if magnitude[y, x] >= a and magnitude[y, x] >= b:
                 result[y, x] = magnitude[y, x]
     return result
@@ -59,6 +60,19 @@ def scalar_hysteresis(image, weak_value=75, strong_value=255):
 
 
 class OptimizedAlgorithmTests(unittest.TestCase):
+    def test_zero_crossing_matches_scalar_neighborhoods_thresholds_and_borders(self):
+        rng = np.random.default_rng(26)
+        for shape in ((0, 3), (1, 1), (2, 9), (5, 7), (35, 41)):
+            response = rng.integers(-25, 26, shape).astype(np.float32)
+            for threshold in (-1, 0, 15, 50, 51):
+                expected = np.zeros(shape, np.uint8)
+                for y in range(1, shape[0] - 1):
+                    for x in range(1, shape[1] - 1):
+                        region = response[y - 1:y + 2, x - 1:x + 2]
+                        if region.min() < 0 < region.max() and region.max() - region.min() >= threshold:
+                            expected[y, x] = 255
+                np.testing.assert_array_equal(zero_crossing(response, threshold), expected)
+
     def test_convolution_products_and_sums_are_bit_identical(self):
         rng = np.random.default_rng(21)
         for shape in ((1, 1), (3, 17), (31, 29)):
@@ -98,7 +112,7 @@ class OptimizedAlgorithmTests(unittest.TestCase):
         np.testing.assert_array_equal(hysteresis(image), scalar_hysteresis(image))
         self.assertEqual(np.count_nonzero(hysteresis(image)[4]), 49)
 
-    def test_entire_canny_matches_original_intermediate_and_final_arrays(self):
+    def test_entire_canny_matches_scalar_intermediate_and_final_arrays(self):
         module = importlib.import_module('src.canny')
         rng = np.random.default_rng(25)
         for image in (rng.integers(0, 256, (24, 31, 3), dtype=np.uint8),

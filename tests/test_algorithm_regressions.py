@@ -5,7 +5,7 @@ import unittest
 import cv2
 import numpy as np
 
-from src.canny import canny, double_threshold
+from src.canny import canny, double_threshold, non_maximum_suppression
 from src.convolution import convolution2d
 from src.prewitt import prewitt
 from src.sobel import sobel
@@ -58,6 +58,23 @@ class ConvolutionTests(unittest.TestCase):
 
 
 class CannyTests(unittest.TestCase):
+    def test_diagonal_nms_compares_neighbors_along_the_gradient(self):
+        # At +45 in array coordinates the gradient runs NW to SE. A stronger
+        # neighbor there must suppress the center even if NE/SW are both zero.
+        for angle, neighbor in ((45, (1, 1)), (135, (1, 3)), (-45, (1, 3))):
+            with self.subTest(angle=angle):
+                magnitude = np.zeros((5, 5), np.float32)
+                magnitude[2, 2] = 10
+                magnitude[neighbor] = 20
+                result = non_maximum_suppression(magnitude, np.full((5, 5), angle, np.float32))
+                self.assertEqual(result[2, 2], 0)
+                # A stronger neighbor across the edge must not suppress it.
+                magnitude[neighbor] = 0
+                other = (1, 3) if neighbor == (1, 1) else (1, 1)
+                magnitude[other] = 20
+                result = non_maximum_suppression(magnitude, np.full((5, 5), angle, np.float32))
+                self.assertEqual(result[2, 2], 10)
+
     def test_constant_images_have_no_edges(self):
         for value in (0, 127, 255):
             for shape in ((50, 50), (15, 15, 3)):

@@ -120,8 +120,9 @@ function setup() {
             if (controls.scanGate) await controls.scanGate;
             return {
                 ok: !controls.failScan,
+                headers: { get: () => controls.cornerHeader ?? JSON.stringify([[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]) },
                 json: async () => ({ error: 'Không tìm thấy trang giấy' }),
-                blob: async () => new Blob(['scanned'], { type: 'image/png' }),
+                blob: async () => new Blob([url.endsWith('/rectify') ? 'rectified' : 'scanned'], { type: 'image/png' }),
             };
         },
     });
@@ -159,6 +160,134 @@ test('one shutter click scans immediately and keeps the same camera stream open'
     assert.equal(app.elements.captureReview.hidden, true);
     assert.equal(app.elements.scanner.hidden, false);
     assert.equal(app.elements.captureButton.disabled, false);
+});
+
+test('crop editor shows the original and applying replaces that page and its PDF image', async () => {
+    const app = setup();
+    await uploadPhotos(app, ['first', 'second']);
+    app.value('openPageViewer(1)');
+    const oldUrl = app.elements.viewerImage.src;
+    await app.click('editCrop');
+    assert.equal(app.value('editingCrop'), true);
+    assert.equal(await app.blobs.get(app.elements.cropImage.src).text(), 'second');
+    assert.equal(app.elements.viewerImage.hidden, true);
+    assert.equal(app.elements.viewerNavigation.hidden, true);
+    assert.equal(app.elements.cropHandles.children.length, 4);
+    assert.equal(app.elements.cropHandles.children[0].style.left, '10%');
+    app.value('moveCropCorner(0, [0.15, 0.12])');
+    await app.click('applyCrop');
+    const request = app.requests.at(-1);
+    assert.equal(request.url, '/api/multipage/rectify');
+    assert.equal(await request.options.body.get('image').text(), 'second', 'Never rescan the processed PNG');
+    assert.deepEqual(JSON.parse(request.options.body.get('corners'))[0], [0.15, 0.12]);
+    assert.equal(app.elements.pageCount.textContent, '2 trang', 'Replace; do not add a duplicate page');
+    assert.equal(app.elements.viewerTitle.textContent, 'Trang 2');
+    assert.equal(await app.blobs.get(app.elements.downloadPage.href).text(), 'rectified');
+    assert.equal(app.blobs.has(oldUrl), false);
+    assert.equal(app.value('editingCrop'), false);
+    await app.click('closeViewer');
+    await app.click('exportPdf');
+    assert.equal(await app.requests.at(-1).options.body.getAll('pages')[1].text(), 'rectified');
+});
+
+test('canceling or escaping a crop keeps the old scan and releases the temporary original URL', async () => {
+    const app = setup();
+    await uploadPhotos(app);
+    app.value('openPageViewer(0)');
+    const oldUrl = app.elements.viewerImage.src;
+    for (const method of ['cancel', 'escape']) {
+        await app.click('editCrop');
+        const originalUrl = app.elements.cropImage.src;
+        app.value('moveCropCorner(0, [0.2, 0.2])');
+        if (method === 'cancel') await app.click('cancelCrop');
+        else app.events['document:keydown']({ key: 'Escape', preventDefault() {} });
+        assert.equal(app.elements.pageViewer.hidden, false);
+        assert.equal(app.value('editingCrop'), false);
+        assert.equal(app.elements.viewerImage.src, oldUrl);
+        assert.equal(app.blobs.has(originalUrl), false);
+    }
+    assert.equal(app.requests.length, 1, 'Cancel must not send a correction');
+});
+
+test('select whole image replaces an inner selection with the four original boundaries', async () => {
+    const app = setup();
+    await uploadPhotos(app);
+    app.value('openPageViewer(0)');
+    await app.click('editCrop');
+    await app.click('selectWholeImage');
+    assert.equal(app.elements.cropHandles.children[0].style.left, '0%');
+    assert.equal(app.elements.cropHandles.children[2].style.left, '100%');
+    assert.equal(app.elements.cropHandles.children[2].style.top, '100%');
+    await app.click('applyCrop');
+    assert.deepEqual(JSON.parse(app.requests.at(-1).options.body.get('corners')),
+        [[0, 0], [1, 0], [1, 1], [0, 1]]);
+    assert.equal(await app.requests.at(-1).options.body.get('image').text(), 'document');
+    assert.equal(app.elements.pageCount.textContent, '1 trang');
+});
+
+test('failed correction retains the scan and original for retry and blocks duplicate submissions', async () => {
+    const app = setup();
+    await uploadPhotos(app);
+    app.value('openPageViewer(0)');
+    const oldUrl = app.elements.viewerImage.src;
+    await app.click('editCrop');
+    app.controls.failScan = true;
+    let release;
+    app.controls.scanGate = new Promise(resolve => { release = resolve; });
+    const pending = app.click('applyCrop');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(app.elements.closeViewer.disabled, true);
+    assert.equal(app.elements.cropHandles.children[0].disabled, true);
+    await app.click('applyCrop');
+    assert.equal(app.requests.length, 2);
+    release();
+    await pending;
+    assert.equal(app.elements.viewerImage.src, oldUrl);
+    assert.equal(app.value('editingCrop'), true);
+    assert.match(app.elements.viewerMessage.textContent, /Không tìm thấy/);
+    app.controls.failScan = false;
+    await app.click('applyCrop');
+    assert.equal(app.value('editingCrop'), false);
+    assert.equal(await app.blobs.get(app.elements.downloadPage.href).text(), 'rectified');
+});
+
+test('corner dragging and keyboard move within the original image and reject crossed polygons', async () => {
+    const app = setup();
+    await uploadPhotos(app);
+    app.value('openPageViewer(0)');
+    await app.click('editCrop');
+    const handle = app.elements.cropHandles.children[0];
+    const pointer = { pointerId: 1, clientX: 200, clientY: 150, preventDefault() {} };
+    handle.handlers.pointerdown[0](pointer);
+    handle.handlers.pointermove[0](pointer);
+    assert.equal(app.value('cropCorners[0][0]'), 0.2);
+    assert.equal(app.value('cropCorners[0][1]'), 0.15);
+    handle.handlers.pointerup[0]({ ...pointer, clientX: -100 });
+    assert.equal(app.value('cropCorners[0][0]'), 0);
+    const before = app.value('JSON.stringify(cropCorners)');
+    app.value('moveCropCorner(0, [1, 1])');
+    assert.equal(app.value('JSON.stringify(cropCorners)'), before);
+    handle.handlers.keydown[0]({ key: 'ArrowRight', preventDefault() {}, stopPropagation() {} });
+    assert.equal(app.value('cropCorners[0][0]'), 1 / 1280);
+    app.events['document:keydown']({ key: 'ArrowRight', preventDefault() {} });
+    assert.equal(app.elements.viewerTitle.textContent, 'Trang 1', 'Editing arrows must not navigate pages');
+});
+
+test('missing corner metadata and unreadable originals leave the saved scan intact', async () => {
+    const app = setup();
+    app.controls.cornerHeader = 'invalid JSON';
+    await uploadPhotos(app);
+    app.value('openPageViewer(0)');
+    const oldUrl = app.elements.viewerImage.src;
+    app.controls.decodeError = true;
+    await app.click('editCrop');
+    assert.equal(app.value('editingCrop'), false);
+    assert.equal(app.elements.viewerImage.src, oldUrl);
+    assert.equal(app.elements.closeViewer.disabled, false);
+    app.controls.decodeError = false;
+    await app.click('editCrop');
+    assert.equal(app.value('cropCorners[0][0]'), 0.03);
+    assert.equal(app.value('cropCorners[2][1]'), 0.97);
 });
 
 test('successive shutter clicks scan distinct pages without confirming or reopening camera', async () => {

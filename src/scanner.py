@@ -13,6 +13,7 @@ from src.sharpening import (
     high_boost,
     unsharp_mask,
 )
+from src.sobel import to_grayscale
 
 
 def resize_for_detection(
@@ -235,6 +236,7 @@ def scan_document(
     detection_width: int = 800,
     output_width: int = 1000,
     verbose: bool = True,
+    edge_image: np.ndarray | None = None,
 ) -> dict[str, object]:
     """
     Thực hiện toàn bộ pipeline scan tài liệu.
@@ -277,6 +279,10 @@ def scan_document(
 
         verbose:
             Có in tiến trình ra terminal hay không.
+
+        edge_image:
+            Ảnh biên đã tính trên ảnh detection, dùng khi so sánh thuật toán.
+            Nếu có, giữ nguyên ảnh biên này và không chạy lại Canny.
 
     Returns:
         Dictionary chứa toàn bộ kết quả
@@ -362,16 +368,29 @@ def scan_document(
     if verbose:
 
         print(
-            "[2/5] Đang chạy Canny..."
+            "[2/5] Đang chạy Canny..." if edge_image is None
+            else "[2/5] Dùng ảnh biên đã tính..."
         )
 
 
-    canny_result = canny(
-        image=detection_image,
-        gaussian_size=gaussian_size,
-        gaussian_sigma=gaussian_sigma,
-        threshold_sigma=threshold_sigma,
-    )
+    if edge_image is None:
+        canny_result = canny(
+            image=detection_image,
+            gaussian_size=gaussian_size,
+            gaussian_sigma=gaussian_sigma,
+            threshold_sigma=threshold_sigma,
+        )
+    else:
+        if (not isinstance(edge_image, np.ndarray)
+                or edge_image.shape != detection_image.shape[:2]
+                or not np.isfinite(edge_image).all()
+                or np.any(edge_image < 0) or np.any(edge_image > 255)):
+            raise ValueError("Ảnh biên phải khớp kích thước ảnh detection và nằm trong [0, 255].")
+        canny_result = {
+            "gray": to_grayscale(detection_image), "edge": edge_image.astype(np.uint8),
+            "blurred": None, "magnitude": None, "nms": None,
+            "low_threshold": None, "high_threshold": None,
+        }
 
 
     edge = canny_result[
@@ -479,6 +498,13 @@ def scan_document(
     original_height, original_width = (
         image.shape[:2]
     )
+
+    if detection_method == "full-frame":
+        # Preserve the original image boundaries exactly, including when the
+        # detection copy has rounded dimensions after resizing.
+        original_corners = np.float32([[0, 0], [original_width - 1, 0],
+                                       [original_width - 1, original_height - 1],
+                                       [0, original_height - 1]])
 
 
     original_corners[:, 0] = np.clip(

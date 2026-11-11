@@ -6,9 +6,12 @@ from unittest.mock import patch
 
 import cv2
 import numpy as np
+from PIL import Image
 
 import app as web
 from src.scanner import scan_document
+from src.perspective import perspective_transform
+from src.sharpening import unsharp_mask
 
 
 class MultipageTests(unittest.TestCase):
@@ -82,6 +85,58 @@ class MultipageTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertIn('Không phát hiện', response.json['error'])
 
+    def test_scan_returns_its_actual_corners_for_the_original_photo_editor(self):
+        expected = scan_document(self.image, output_width=2400, verbose=False)['corners']
+        response = self.post_image('/api/multipage/scan')
+        actual = np.asarray(json.loads(response.headers['X-Document-Corners']))
+        np.testing.assert_allclose(actual * [199, 159], expected, atol=0.001)
+
+    def test_manual_corners_use_original_pixels_without_running_detection(self):
+        # Clockwise selection deliberately starts at another corner. Preserve
+        # the user's corner identities instead of silently rotating the page.
+        selected = self.corners[1:] + self.corners[:1]
+        pixels = np.float32(selected) * [199, 159]
+        expected = unsharp_mask(perspective_transform(self.image, pixels, preserve_order=True))['sharpened']
+        with patch('multipage.scan_document') as detector:
+            response = self.post_image('/api/multipage/rectify', corners=json.dumps(selected))
+        self.assertEqual(response.status_code, 200)
+        detector.assert_not_called()
+        actual = cv2.imdecode(np.frombuffer(response.data, np.uint8), cv2.IMREAD_UNCHANGED)
+        np.testing.assert_array_equal(actual, expected)
+        np.testing.assert_allclose(json.loads(response.headers['X-Document-Corners']), selected, atol=0.000001)
+
+    def test_invalid_manual_corners_do_not_produce_a_crop(self):
+        for corners in (None, [], [[0, 0]] * 4,
+                        [[0, 0], [1, 1], [1, 0], [0, 1]],
+                        [[0, 0], [2, 0], [1, 1], [0, 1]],
+                        [[0, 0], [1, 0], [1, float('nan')], [0, 1]],
+                        [[0, 0], [0.02, 0], [0.02, 0.02], [0, 0.02]]):
+            with self.subTest(corners=corners):
+                response = self.post_image('/api/multipage/rectify', corners=json.dumps(corners))
+                self.assertEqual(response.status_code, 400)
+                self.assertIn('error', response.json)
+        response = self.post_image('/api/multipage/rectify', corners='not json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_manual_crop_coordinates_follow_exif_oriented_original(self):
+        buffer = io.BytesIO()
+        source = Image.fromarray(cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB))
+        exif = source.getexif()
+        exif[274] = 6  # Phone JPEG stored sideways, displayed upright.
+        source.save(buffer, format='JPEG', exif=exif)
+        raw = buffer.getvalue()
+        oriented = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+        height, width = oriented.shape[:2]
+        selected = [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]]
+        expected = unsharp_mask(perspective_transform(
+            oriented, np.float32(selected) * [width - 1, height - 1], preserve_order=True))['sharpened']
+        response = self.client.post('/api/multipage/rectify', data={
+            'image': (io.BytesIO(raw), 'phone.jpg'), 'corners': json.dumps(selected),
+        })
+        self.assertEqual(response.status_code, 200)
+        actual = cv2.imdecode(np.frombuffer(response.data, np.uint8), cv2.IMREAD_UNCHANGED)
+        np.testing.assert_array_equal(actual, expected)
+
     def test_high_resolution_crop_keeps_more_detail_than_the_old_1600_limit(self):
         self.image = np.full((1500, 2100, 3), 35, np.uint8)
         cv2.rectangle(self.image, (100, 100), (2000, 1400), (245, 245, 245), -1)
@@ -107,7 +162,7 @@ class MultipageTests(unittest.TestCase):
         self.assertLessEqual(image.shape[1], 2400)
 
     def test_corrupt_upload_is_a_json_error(self):
-        for route in ('/api/multipage/detect', '/api/multipage/scan'):
+        for route in ('/api/multipage/detect', '/api/multipage/scan', '/api/multipage/rectify'):
             response = self.client.post(route, data={'image': (io.BytesIO(b'bad'), 'bad.png')})
             self.assertEqual(response.status_code, 400)
             self.assertIn('error', response.json)

@@ -2,11 +2,11 @@
 // node tests/browser_camera_smoke.cjs <temporary artifact folder>
 const assert = require('node:assert/strict');
 const { writeFileSync } = require('node:fs');
-const { join } = require('node:path');
+const { join, resolve } = require('node:path');
 
 async function main() {
-    const folder = process.argv[2];
-    if (!folder) throw new Error('Pass the temporary folder containing document.png');
+    if (!process.argv[2]) throw new Error('Pass the temporary folder containing document.png');
+    const folder = resolve(process.argv[2]);
     const targets = await (await fetch('http://127.0.0.1:9224/json/list')).json();
     const target = targets.find(item => item.type === 'page');
     const socket = new WebSocket(target.webSocketDebuggerUrl);
@@ -53,12 +53,15 @@ async function main() {
     try {
         await send('Page.enable'); await send('Runtime.enable'); await send('Network.enable');
         await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-        await send('Page.navigate', { url: 'http://127.0.0.1:5051/multipage' });
+        const baseUrl = process.env.DOCUSCAN_BASE_URL || 'http://127.0.0.1:5000';
+        await send('Page.navigate', { url: `${baseUrl}/multipage` });
         await waitFor('document.readyState === "complete" && typeof startCamera === "function"');
         await evaluate('document.getElementById("openCamera").click()');
         await waitFor('stream && !openingCamera && liveCorners !== null');
         assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
         await screenshot('camera-live.png');
+        if (process.env.DOCUSCAN_EXPECT_SURFACE)
+            assert.equal(await evaluate('Math.max(...liveCorners.map(p => p[1])) < 0.78'), true, 'Guide must exclude the lower keyboard');
         await evaluate('document.getElementById("captureButton").click()');
         await waitFor('pages.length === 1 && screen === "live" && !busy');
         assert.equal(await evaluate('stream !== null && !document.getElementById("camera").hidden'), true);
@@ -70,6 +73,11 @@ async function main() {
         await waitFor('!document.getElementById("pageViewer").hidden');
         assert.equal(await evaluate('document.getElementById("viewerImage").src === document.getElementById("lastPage").src'), true);
         assert.equal(await evaluate('stream !== null'), true);
+        await waitFor('document.getElementById("viewerImage").complete && document.getElementById("viewerImage").naturalWidth > 0');
+        if (process.env.DOCUSCAN_EXPECT_SURFACE) {
+            assert.equal(await evaluate('document.getElementById("viewerImage").naturalWidth > document.getElementById("viewerImage").naturalHeight'), true, 'Captured result must be the landscape display');
+            assert.equal(await evaluate('Math.max(...pages[1].corners.map(p => p[1])) < 0.78'), true, 'Final crop must exclude the lower keyboard');
+        }
         await screenshot('camera-result.png');
         await evaluate('document.getElementById("closeViewer").click(); document.getElementById("closeScanner").click()');
 

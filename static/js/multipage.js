@@ -30,6 +30,10 @@ let viewerIndex = -1;
 let viewerPreviousFocus;
 let viewerZoomed = false;
 let nativeCapturePending = false;
+let editingCrop = false;
+let cropCorners = null;
+let cropSourceUrl = null;
+let cropSize = null;
 
 function setStatus(message) {
     byId('status').textContent = message;
@@ -44,6 +48,14 @@ function setBusy(value) {
     byId('closeScanner').disabled = value;
     byId('chooseImage').disabled = value;
     byId('showPages').disabled = value;
+    byId('closeViewer').disabled = value;
+    byId('editCrop').disabled = value;
+    byId('applyCrop').disabled = value;
+    byId('cancelCrop').disabled = value;
+    byId('selectWholeImage').disabled = value;
+    byId('previousPage').disabled = value || viewerIndex <= 0;
+    byId('nextPage').disabled = value || viewerIndex >= pages.length - 1;
+    byId('cropHandles').querySelectorAll('button').forEach(button => { button.disabled = value; });
     updateCaptureControls();
     renderPages();
 }
@@ -183,7 +195,7 @@ async function detectLive(request) {
             if (request !== cameraRequest) return;
             liveCorners = detected;
             paintCorners();
-            setStatus(detected ? 'Đã thấy trang giấy · Giữ máy ổn định và bấm chụp' : 'Đặt đủ bốn góc trang giấy vào khung hình');
+            setStatus(detected ? 'Đã thấy khung tài liệu · Giữ máy ổn định và bấm chụp' : 'Đặt đủ bốn góc tài liệu vào khung hình');
         }
     } catch (error) {
         if (request === cameraRequest) {
@@ -193,7 +205,7 @@ async function detectLive(request) {
         }
     } finally {
         if (request === cameraRequest && stream && screen === 'live' && pageViewer.hidden)
-            detectionTimer = setTimeout(() => detectLive(request), 900);
+            detectionTimer = setTimeout(() => detectLive(request), 350);
     }
 }
 
@@ -383,7 +395,14 @@ async function scanFile(file) {
         throw new Error(error.error || 'Scan thất bại.');
     }
     const blob = await response.blob();
-    pages.push({ blob, url: URL.createObjectURL(blob) });
+    pages.push({ blob, url: URL.createObjectURL(blob), source: file, corners: responseCorners(response) });
+}
+
+function responseCorners(response) {
+    try {
+        const corners = JSON.parse(response.headers?.get('X-Document-Corners') || 'null');
+        return validCorners(corners) ? corners : null;
+    } catch { return null; }
 }
 
 async function scanCapturedPhoto() {
@@ -444,7 +463,7 @@ function renderPages() {
 }
 
 function showViewerPage(index) {
-    if (index < 0 || index >= pages.length) return;
+    if (busy || editingCrop || index < 0 || index >= pages.length) return;
     viewerIndex = index;
     const page = pages[index];
     byId('viewerImage').src = page.url;
@@ -456,6 +475,7 @@ function showViewerPage(index) {
     byId('previousPage').disabled = index === 0;
     byId('nextPage').disabled = index === pages.length - 1;
     viewerZoomed = false;
+    byId('viewerMessage').hidden = true;
     updateViewerZoom();
 }
 
@@ -474,7 +494,9 @@ function openPageViewer(index) {
 }
 
 function closePageViewer() {
-    if (pageViewer.hidden) return;
+    if (busy || pageViewer.hidden) return;
+    const closedIndex = viewerIndex;
+    endCropEditor();
     pageViewer.hidden = true;
     viewerIndex = -1;
     byId('viewerImage').removeAttribute('src');
@@ -482,7 +504,9 @@ function closePageViewer() {
     byId('library').inert = false;
     scanner.inert = false;
     document.body.classList.remove('viewer-open');
-    viewerPreviousFocus?.focus();
+    const returnFocus = viewerPreviousFocus?.isConnected ? viewerPreviousFocus
+        : scanner.hidden ? pageGrid.children[closedIndex]?.children[0] : byId('showPages');
+    returnFocus?.focus();
     if (stream && screen === 'live' && !busy)
         detectionTimer = setTimeout(() => detectLive(cameraRequest), 150);
 }
@@ -494,6 +518,155 @@ function updateViewerZoom() {
     byId('zoomViewer').setAttribute('aria-pressed', String(viewerZoomed));
     byId('zoomViewer').setAttribute('aria-label', viewerZoomed ? 'Vừa màn hình' : 'Xem ảnh ở kích thước gốc');
     byId('zoomViewer').textContent = viewerZoomed ? 'Vừa màn hình' : '100%';
+}
+
+function fitCropSurface() {
+    if (!editingCrop || !cropSize) return;
+    const body = byId('viewerBody');
+    const availableWidth = Math.max(1, (body.clientWidth || window.innerWidth) - 64);
+    const availableHeight = Math.max(1, (body.clientHeight || window.innerHeight * 0.6) - 64);
+    const ratio = cropSize[0] / cropSize[1];
+    const width = Math.min(availableWidth, availableHeight * ratio);
+    byId('cropSurface').style.width = `${width}px`;
+    byId('cropSurface').style.height = `${width / ratio}px`;
+}
+
+function paintCrop() {
+    const scaled = cropCorners.map(point => point.map(value => value * 1000));
+    byId('cropPolygon').setAttribute('points', scaled.map(point => point.join(',')).join(' '));
+    byId('cropMask').setAttribute('d', `M0 0H1000V1000H0Z M${scaled.map(point => point.join(' ')).join('L')}Z`);
+    Array.from(byId('cropHandles').children).forEach((handle, index) => {
+        handle.style.left = `${cropCorners[index][0] * 100}%`;
+        handle.style.top = `${cropCorners[index][1] * 100}%`;
+    });
+}
+
+function moveCropCorner(index, point) {
+    if (!editingCrop || busy) return;
+    const updated = cropCorners.map(corner => corner.slice());
+    updated[index] = point.map(value => Math.max(0, Math.min(1, value)));
+    if (!validCorners(updated)) return;
+    cropCorners = updated;
+    paintCrop();
+}
+
+async function beginCropEditor() {
+    if (busy || editingCrop || viewerIndex < 0) return;
+    const page = pages[viewerIndex];
+    if (!page.source) return;
+    setBusy(true);
+    const url = URL.createObjectURL(page.source);
+    try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        cropSize = [image.naturalWidth, image.naturalHeight];
+        cropSourceUrl = url;
+        cropCorners = (page.corners || [[0.03, 0.03], [0.97, 0.03], [0.97, 0.97], [0.03, 0.97]])
+            .map(point => point.slice());
+        editingCrop = true;
+        byId('cropImage').src = url;
+        byId('cropSurface').hidden = false;
+        byId('cropActions').hidden = false;
+        byId('viewerNavigation').hidden = true;
+        byId('viewerImage').hidden = true;
+        for (const id of ['editCrop', 'zoomViewer', 'downloadPage']) byId(id).hidden = true;
+        byId('viewerMessage').hidden = true;
+        viewerZoomed = false;
+        updateViewerZoom();
+        byId('viewerBody').classList.add('is-editing');
+        const handles = byId('cropHandles');
+        handles.replaceChildren();
+        ['trên trái', 'trên phải', 'dưới phải', 'dưới trái'].forEach((label, index) => {
+            const handle = document.createElement('button');
+            handle.type = 'button';
+            handle.className = 'corner-handle';
+            handle.textContent = index + 1;
+            handle.setAttribute('aria-label', `Góc ${label}; dùng phím mũi tên để di chuyển`);
+            let pointer = null;
+            const move = event => {
+                const rect = byId('cropSurface').getBoundingClientRect();
+                if (rect.width && rect.height)
+                    moveCropCorner(index, [(event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height]);
+            };
+            handle.addEventListener('pointerdown', event => {
+                if (busy) return;
+                event.preventDefault();
+                pointer = event.pointerId;
+                handle.setPointerCapture(pointer);
+                handle.focus();
+            });
+            handle.addEventListener('pointermove', event => { if (pointer === event.pointerId) move(event); });
+            handle.addEventListener('pointerup', event => {
+                if (pointer !== event.pointerId) return;
+                move(event);
+                pointer = null;
+            });
+            handle.addEventListener('pointercancel', () => { pointer = null; });
+            handle.addEventListener('lostpointercapture', () => { pointer = null; });
+            handle.addEventListener('keydown', event => {
+                const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+                if (!direction) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const step = event.shiftKey ? 10 : 1;
+                moveCropCorner(index, cropCorners[index].map((value, axis) => value + direction[axis] * step / cropSize[axis]));
+            });
+            handles.appendChild(handle);
+        });
+        fitCropSurface();
+        paintCrop();
+    } catch {
+        URL.revokeObjectURL(url);
+        byId('viewerMessage').textContent = 'Không thể mở ảnh gốc để chỉnh góc.';
+        byId('viewerMessage').hidden = false;
+    } finally { setBusy(false); }
+    if (editingCrop) byId('cropHandles').children[0]?.focus();
+}
+
+function endCropEditor() {
+    if (!editingCrop) return;
+    editingCrop = false;
+    if (cropSourceUrl) URL.revokeObjectURL(cropSourceUrl);
+    cropSourceUrl = cropCorners = cropSize = null;
+    byId('cropImage').removeAttribute('src');
+    byId('cropSurface').hidden = true;
+    byId('cropActions').hidden = true;
+    byId('viewerNavigation').hidden = false;
+    byId('viewerImage').hidden = false;
+    byId('viewerBody').classList.remove('is-editing');
+    for (const id of ['editCrop', 'zoomViewer', 'downloadPage']) byId(id).hidden = false;
+    byId('viewerMessage').hidden = true;
+}
+
+async function applyCrop() {
+    if (busy || !editingCrop || !validCorners(cropCorners)) return;
+    const page = pages[viewerIndex];
+    const selected = cropCorners.map(point => point.slice());
+    setBusy(true);
+    byId('pageViewer').setAttribute('aria-busy', 'true');
+    byId('viewerMessage').textContent = 'Đang nắn lại từ ảnh gốc…';
+    byId('viewerMessage').hidden = false;
+    try {
+        const data = new FormData();
+        data.append('image', page.source, page.source.name || 'original.jpg');
+        data.append('corners', JSON.stringify(selected));
+        const response = await fetch('/api/multipage/rectify', { method: 'POST', body: data });
+        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Chưa thể nắn lại ảnh.');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        URL.revokeObjectURL(page.url);
+        Object.assign(page, { blob, url, corners: selected });
+        endCropEditor();
+        setStatus(`Đã nắn lại trang ${viewerIndex + 1}.`);
+    } catch (error) {
+        byId('viewerMessage').textContent = error.message;
+        byId('viewerMessage').hidden = false;
+    } finally {
+        byId('pageViewer').setAttribute('aria-busy', 'false');
+        setBusy(false);
+    }
+    if (!editingCrop) { showViewerPage(viewerIndex); byId('editCrop').focus(); }
 }
 
 function movePage(index, direction) {
@@ -535,6 +708,18 @@ byId('nextPage').addEventListener('click', () => showViewerPage(viewerIndex + 1)
 byId('zoomViewer').addEventListener('click', () => {
     viewerZoomed = !viewerZoomed;
     updateViewerZoom();
+});
+byId('editCrop').addEventListener('click', beginCropEditor);
+byId('cancelCrop').addEventListener('click', () => {
+    if (busy) return;
+    endCropEditor();
+    byId('editCrop').focus();
+});
+byId('applyCrop').addEventListener('click', applyCrop);
+byId('selectWholeImage').addEventListener('click', () => {
+    if (busy || !editingCrop) return;
+    cropCorners = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    paintCrop();
 });
 byId('chooseImage').addEventListener('click', () => byId('imageFiles').click());
 byId('nativeCameraButton').addEventListener('click', () => {
@@ -592,16 +777,18 @@ byId('clearPages').addEventListener('click', () => {
 });
 video.addEventListener('loadedmetadata', fitSurface);
 window.addEventListener('resize', fitSurface);
+window.addEventListener('resize', fitCropSurface);
 window.addEventListener('pagehide', stopCamera);
 document.addEventListener('keydown', event => {
     const dialog = !pageViewer.hidden ? pageViewer : !scanner.hidden ? scanner : null;
     if (!dialog) return;
     if (event.key === 'Escape' && !busy) {
         event.preventDefault();
-        if (dialog === pageViewer) closePageViewer();
+        if (dialog === pageViewer && editingCrop) { endCropEditor(); byId('editCrop').focus(); }
+        else if (dialog === pageViewer) closePageViewer();
         else closeScanner();
     }
-    if (dialog === pageViewer && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    if (dialog === pageViewer && !editingCrop && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
         event.preventDefault();
         showViewerPage(viewerIndex + (event.key === 'ArrowLeft' ? -1 : 1));
     }

@@ -72,13 +72,17 @@
         </form>
       </section>
       <section class="panel preview-panel" aria-labelledby="result-heading">
-        <div class="panel-heading"><span class="step-number">02</span><div><h2 id="result-heading">{{ 'Tổng quan kết quả' if comparing else 'Bản quét của bạn' }}</h2><p>{{ 'Sẵn sàng khám phá các đường biên' if comparing else 'Căn thẳng. Rõ nét. Sẵn sàng sử dụng.' }}</p></div>{% if final_image or results %}<span class="complete-badge">Hoàn tất</span>{% else %}<span class="small-label">XEM TRƯỚC</span>{% endif %}</div>
+        <div class="panel-heading"><span class="step-number">02</span><div><h2 id="result-heading">{{ 'Bản quét để đối chiếu' if comparing else 'Bản quét của bạn' }}</h2><p>{{ 'Chọn từng phương pháp bên dưới để xem đủ kết quả.' if comparing else 'Căn thẳng. Rõ nét. Sẵn sàng sử dụng.' }}</p></div>{% if final_image or results %}<span class="complete-badge">{{ 'Đã so sánh' if comparing else 'Hoàn tất' }}</span>{% else %}<span class="small-label">XEM TRƯỚC</span>{% endif %}</div>
         {% if final_image %}
         <div class="result-preview"><img src="{{ url_for('static', filename=final_image) }}" alt="Tài liệu sau khi nắn phối cảnh và làm nét"></div>
         <div class="result-details"><span><strong>{{ width }} × {{ height }}</strong> px</span><span>{{ processing_time }} giây</span></div>
         <a class="button-primary download-button" href="{{ url_for('static', filename=final_image) }}" download><svg><use href="#icon-download"/></svg>Tải bản quét JPG</a>
         {% elif results %}
-        <div class="result-preview comparison-original"><img src="{{ url_for('static', filename=original_image) }}" alt="Ảnh gốc dùng để so sánh thuật toán"></div><div class="result-details"><span><strong>{{ width }} × {{ height }}</strong> px</span><span>{{ total_time }} giây</span></div><a class="button-secondary" href="#results">Xem kết quả 6 thuật toán <span>↓</span></a>
+        <p class="comparison-summary" id="comparisonSummary">{{ scan_count }} / {{ results|length }} phương pháp tạo được bản quét.{% if overview %} Đang xem: <strong>{{ overview.name }}</strong>.{% else %} Chưa tìm được khung giấy; xem ảnh biên của từng phương pháp bên dưới.{% endif %}</p>
+        <div class="result-preview comparison-original"><img id="comparisonOverview" src="{{ url_for('static', filename=overview.scan_image if overview else original_image) }}" alt="{{ 'Bản quét từ ' ~ overview.name if overview else 'Ảnh gốc chưa xác định được khung giấy' }}"></div>
+        <div class="result-details"><span><strong>{{ overview.width if overview else width }} × {{ overview.height if overview else height }}</strong> px</span><span>{{ total_time }} giây</span></div>
+        {% if overview %}<a class="button-primary download-button" href="{{ url_for('static', filename=overview.scan_image) }}" download><svg><use href="#icon-download"/></svg>Tải bản quét · {{ overview.name }}</a>{% endif %}
+        <a class="button-secondary" href="#results">Xem kết quả 6 thuật toán <span>↓</span></a>
         {% else %}
         <div class="empty-preview"><div class="document-illustration" aria-hidden="true"><div class="scan-corner tl"></div><div class="scan-corner tr"></div><div class="scan-corner bl"></div><div class="scan-corner br"></div><div class="paper"><div class="paper-heading"></div><i></i><i></i><i></i><div class="paper-block"></div><i></i><i class="short"></i></div><div class="scan-line"></div><span class="paper-check"><svg><use href="#icon-check"/></svg></span></div><h3>{{ 'Mọi đường biên đều có câu chuyện' if comparing else 'Bản quét đẹp bắt đầu từ đây' }}</h3><p>{{ 'Tải ảnh lên để xem cách mỗi thuật toán nhận diện các chi tiết trong ảnh.' if comparing else 'Chọn ảnh bên trái. Tài liệu sau khi xử lý sẽ xuất hiện tại không gian này.' }}</p><span class="waiting-badge"><span></span>Đang chờ ảnh của bạn</span></div>
         <div class="preview-footer"><svg><use href="#icon-check"/></svg>{{ 'So sánh trên cùng ảnh đầu vào' if comparing else 'Tự động căn chỉnh bốn góc tài liệu' }}</div>
@@ -86,8 +90,15 @@
       </section>
     </div>
     {% if results or final_image %}
-    <section class="results-section" id="results"><div class="section-heading"><div><p class="eyebrow">{{ 'SÁU PHƯƠNG PHÁP · MỘT ẢNH ĐẦU VÀO' if results else 'TỪNG BƯỚC XỬ LÝ' }}</p><h2>{{ 'Khám phá kết quả phát hiện biên' if results else 'Từ ảnh gốc đến bản quét' }}</h2></div><span class="small-label">{{ '6 kết quả' if results else '4 giai đoạn' }}</span></div><div class="result-grid">
-      {% if results %}{% for item in results %}<article class="result-card"><div class="result-card-heading"><h3>{{ item.name }}</h3><span>{{ item.time }} s</span></div><a href="{{ url_for('static', filename=item.image) }}" target="_blank" rel="noopener" aria-label="Mở ảnh {{ item.name }} đầy đủ"><img loading="lazy" src="{{ url_for('static', filename=item.image) }}" alt="Biên ảnh do {{ item.name }} phát hiện"></a><a class="result-download" href="{{ url_for('static', filename=item.image) }}" download>Tải ảnh biên <svg><use href="#icon-download"/></svg></a></article>{% endfor %}
+    <section class="results-section" id="results"><div class="section-heading"><div><p class="eyebrow">{{ 'SÁU PHƯƠNG PHÁP · MỘT ẢNH ĐẦU VÀO' if results else 'TỪNG BƯỚC XỬ LÝ' }}</p><h2>{{ 'Khám phá kết quả phát hiện biên' if results else 'Từ ảnh gốc đến bản quét' }}</h2></div><span class="small-label">{{ '6 kết quả' if results else '4 giai đoạn' }}</span></div>
+    <div class="result-grid">
+      {% if results %}{% for item in results %}
+      <article class="result-card" data-comparison-card data-comparison-key="{{ item.key }}" data-scan-status="{{ 'ready' if item.scan_image else 'failed' }}">
+        <div class="result-card-heading"><h3>{{ item.name }}</h3><span>{{ item.time }} s</span></div>
+        <a data-comparison-preview href="{{ url_for('static', filename=item.image) }}" target="_blank" rel="noopener" aria-label="Mở ảnh {{ item.name }} đầy đủ"><img loading="lazy" src="{{ url_for('static', filename=item.image) }}" alt="Biên ảnh do {{ item.name }} phát hiện"></a>
+        <a class="result-download" href="{{ url_for('static', filename=item.image) }}" download>Tải ảnh biên <svg><use href="#icon-download"/></svg></a>
+      </article>
+      {% endfor %}
       {% else %}{% for title, image in [('Ảnh gốc', original_image), ('Phát hiện biên', edge_image), ('Xác định trang giấy', detection_image), ('Nắn phối cảnh', perspective_image)] %}<article class="result-card"><div class="result-card-heading"><h3><span class="stage-number">0{{ loop.index }}</span>{{ title }}</h3></div><a href="{{ url_for('static', filename=image) }}" target="_blank" rel="noopener" aria-label="Mở ảnh {{ title }} đầy đủ"><img loading="lazy" src="{{ url_for('static', filename=image) }}" alt="{{ title }}"></a></article>{% endfor %}{% endif %}
     </div></section>
     {% endif %}

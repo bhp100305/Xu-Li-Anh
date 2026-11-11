@@ -38,17 +38,18 @@ def non_maximum_suppression(magnitude, direction):
 
     current = magnitude[1:-1, 1:-1]
     inner_angle = angle[1:-1, 1:-1]
-    # Preserve all four direction bins, diagonal conventions, ties and borders.
+    # Array coordinates have y increasing downwards. A +45 degree gradient
+    # must compare NW/SE; -45 (135 modulo 180) must compare NE/SW.
     directions = (
         (((inner_angle >= 0) & (inner_angle < 22.5))
          | ((inner_angle >= 157.5) & (inner_angle <= 180)),
          magnitude[1:-1, :-2], magnitude[1:-1, 2:]),
         ((inner_angle >= 22.5) & (inner_angle < 67.5),
-         magnitude[:-2, 2:], magnitude[2:, :-2]),
+         magnitude[:-2, :-2], magnitude[2:, 2:]),
         ((inner_angle >= 67.5) & (inner_angle < 112.5),
          magnitude[:-2, 1:-1], magnitude[2:, 1:-1]),
         ((inner_angle >= 112.5) & (inner_angle < 157.5),
-         magnitude[:-2, :-2], magnitude[2:, 2:]),
+         magnitude[:-2, 2:], magnitude[2:, :-2]),
     )
     keep = current >= 0
     for mask, neighbor1, neighbor2 in directions:

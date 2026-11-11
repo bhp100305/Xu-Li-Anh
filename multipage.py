@@ -1,5 +1,6 @@
 
 import io
+import json
 import cv2
 import numpy as np
 
@@ -9,8 +10,10 @@ from flask import (
     request, send_file
 )
 
-from src.scanner import scan_document
-from src.document_detector import find_document_from_edges, find_document_from_brightness
+from src.scanner import scan_document, resize_output
+from src.document_detector import detect_document
+from src.perspective import perspective_transform
+from src.sharpening import unsharp_mask
 
 multipage_bp = Blueprint("multipage", __name__)
 
@@ -48,9 +51,7 @@ def detect_page():
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 1.2)
         edges = cv2.Canny(blurred, 40, 120)
-        corners = find_document_from_edges(edges)
-        if corners is None:
-            corners = find_document_from_brightness(small)
+        corners = detect_document(small, edges, preview_only=True)["corners"]
         if corners is None:
             return jsonify(corners=None)
         corners = corners / np.array([small.shape[1] - 1, small.shape[0] - 1]).clip(1)
@@ -95,12 +96,51 @@ def scan_page():
         if not success:
             raise RuntimeError("Không thể mã hóa ảnh")
 
-        return send_file(
+        response = send_file(
             io.BytesIO(encoded.tobytes()),
             mimetype="image/png"
         )
+        if "corners" in result:
+            height, width = image.shape[:2]
+            normalized = result["corners"] / np.float32([max(1, width - 1), max(1, height - 1)])
+            response.headers["X-Document-Corners"] = json.dumps(normalized.tolist())
+        return response
 
     except (ValueError, RuntimeError) as exc:
+        return jsonify(error=str(exc)), 422
+
+
+@multipage_bp.post("/api/multipage/rectify")
+def rectify_page():
+    """Apply only the four corners explicitly confirmed in the crop editor.
+
+    The live camera overlay never calls this route. Work on original pixels,
+    avoiding another round of detection or repeated resampling of a scan.
+    """
+    try:
+        image = read_uploaded_image()
+        corners = np.asarray(json.loads(request.form.get("corners", "null")), dtype=np.float32)
+        if (corners.shape != (4, 2) or not np.isfinite(corners).all()
+                or np.any(corners < 0) or np.any(corners > 1)):
+            raise ValueError("Cần chọn đủ bốn góc trong ảnh gốc")
+        # Keep a clockwise polygon; reject crossing, repeated or tiny selections.
+        sides = np.roll(corners, -1, axis=0) - corners
+        cross = sides[:, 0] * np.roll(sides[:, 1], -1) - sides[:, 1] * np.roll(sides[:, 0], -1)
+        if np.any(cross <= 0) or cv2.contourArea(corners) < 0.01:
+            raise ValueError("Bốn góc phải tạo thành khung giấy không giao nhau")
+        height, width = image.shape[:2]
+        pixels = corners * np.float32([width - 1, height - 1])
+        warped = perspective_transform(image, pixels, preserve_order=True)
+        scanned = unsharp_mask(resize_output(warped, max_width=2400))["sharpened"]
+        success, encoded = cv2.imencode(".png", scanned)
+        if not success:
+            raise RuntimeError("Không thể mã hóa ảnh")
+        response = send_file(io.BytesIO(encoded.tobytes()), mimetype="image/png")
+        response.headers["X-Document-Corners"] = json.dumps(corners.tolist())
+        return response
+    except (ValueError, TypeError, OSError, Image.DecompressionBombError, cv2.error) as exc:
+        return jsonify(error=str(exc) or "Không thể đọc ảnh gốc"), 400
+    except RuntimeError as exc:
         return jsonify(error=str(exc)), 422
 
 

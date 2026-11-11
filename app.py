@@ -758,7 +758,8 @@ def compare() -> tuple[str, int] | str:
         comparison_result = (
             compare_algorithms(
                 image=image,
-                max_width=700,
+                max_width=800,
+                include_scans=True,
             )
         )
 
@@ -871,8 +872,7 @@ def compare() -> tuple[str, int] | str:
             )
 
 
-            template_results.append(
-                {
+            entry = {
                     "key": (
                         algorithm_key
                     ),
@@ -893,7 +893,22 @@ def compare() -> tuple[str, int] | str:
                         4,
                     ),
                 }
-            )
+            entry["scan_error"] = algorithm_data.get("scan_error")
+            entry["scan_time"] = round(float(algorithm_data.get("scan_time", 0)), 4)
+            entry["total_time"] = round(algorithm_time + entry["scan_time"], 4)
+            scanned = algorithm_data.get("scan")
+            if isinstance(scanned, dict):
+                entry["scan_image"] = save_image(scanned["sharpened"], f"{job_id}_{algorithm_key}_scan.png")
+                entry["detection_image"] = save_image(scanned["detection_preview"], f"{job_id}_{algorithm_key}_outline.jpg")
+                entry["width"] = scanned["final_width"]
+                entry["height"] = scanned["final_height"]
+                entry["method"] = {
+                    "edge": "Khung từ ảnh biên", "hough": "Khung từ đường biên",
+                    "brightness": "Khung từ vùng giấy sáng", "paper-region": "Khung đã tách vùng giấy",
+                    "full-frame": "Giữ toàn bộ ảnh",
+                    "surface": "Khung bốn cạnh liên tục",
+                }.get(scanned["detection_method"], "Đã xác định khung giấy")
+            template_results.append(entry)
 
 
         # ----------------------------------------------------
@@ -906,6 +921,10 @@ def compare() -> tuple[str, int] | str:
             f"{comparison_total_time:.2f} giây"
         )
 
+
+        scan_results = [item for item in template_results if item.get("scan_image")]
+        overview = next((item for item in scan_results if item["key"] == "canny"),
+                        scan_results[0] if scan_results else None)
 
         return render_template(
             "index.html",
@@ -920,6 +939,8 @@ def compare() -> tuple[str, int] | str:
             results=(
                 template_results
             ),
+            scan_count=len(scan_results),
+            overview=overview,
 
             low_threshold=round(
                 float(

@@ -78,31 +78,18 @@ def zero_crossing(response, threshold=0.0):
         dtype=np.uint8
     )
 
-    for y in range(1, height - 1):
-        for x in range(1, width - 1):
-
-            region = response[
-                y - 1:y + 2,
-                x - 1:x + 2
-            ]
-
-            min_value = np.min(region)
-            max_value = np.max(region)
-
-            # Có đổi dấu qua 0
-            has_sign_change = (
-                min_value < 0
-                and max_value > 0
-            )
-
-            # Độ chênh đủ lớn để tránh nhiễu nhỏ
-            strong_enough = (
-                max_value - min_value
-                >= threshold
-            )
-
-            if has_sign_change and strong_enough:
-                edge[y, x] = 255
+    if height < 3 or width < 3:
+        return edge
+    minimum = response[:-2, :-2].copy()
+    maximum = minimum.copy()
+    for dy in range(3):
+        for dx in range(3):
+            neighbor = response[dy:dy + height - 2, dx:dx + width - 2]
+            np.minimum(minimum, neighbor, out=minimum)
+            np.maximum(maximum, neighbor, out=maximum)
+    edge[1:-1, 1:-1] = np.where(
+        (minimum < 0) & (maximum > 0) & (maximum - minimum >= threshold), 255, 0,
+    )
 
     return edge
 

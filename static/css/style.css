@@ -1266,6 +1266,9 @@ input[type=range]::-moz-range-thumb {
   height:14px;
 }
 
+.comparison-summary{margin:20px 24px 0;font-size:12px;line-height:1.7;color:var(--muted)}
+.comparison-summary strong{color:var(--ink)}
+
 #guide {
   scroll-margin-top:24px;
 }

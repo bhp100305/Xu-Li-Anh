@@ -108,7 +108,8 @@ def get_output_size(
 
 def perspective_transform(
     image: np.ndarray,
-    corners: np.ndarray
+    corners: np.ndarray,
+    preserve_order: bool = False,
 ) -> np.ndarray:
     """
     Nắn phối cảnh ảnh tài liệu.
@@ -119,6 +120,9 @@ def perspective_transform(
 
         corners:
             4 góc của tài liệu.
+
+        preserve_order:
+            Giữ thứ tự góc đã được người dùng xác nhận trong trình chỉnh cắt.
 
     Returns:
         Ảnh tài liệu sau khi nắn phối cảnh.
@@ -139,7 +143,7 @@ def perspective_transform(
     # BƯỚC 1: SẮP XẾP 4 GÓC
     # ==========================================
 
-    ordered = order_points(
+    ordered = corners.astype(np.float32) if preserve_order else order_points(
         corners
     )
 
