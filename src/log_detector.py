@@ -145,6 +145,7 @@ def log_detector(
     # BƯỚC 2: Tạo Gaussian kernel
     # ==========================================
 
+    # Làm mờ Gaussian trước để giảm nhiễu khi lấy đạo hàm bậc hai.
     g_kernel = gaussian_kernel(
         size=gaussian_size,
         sigma=sigma
@@ -191,6 +192,7 @@ def log_detector(
     # BƯỚC 6: Zero Crossing
     # ==========================================
 
+    # Tìm nơi đáp ứng Laplacian đổi dấu và vượt ngưỡng để xác định biên.
     edge = zero_crossing(
         laplacian_response,
         threshold=zero_threshold
@@ -205,23 +207,3 @@ def log_detector(
         "laplacian_display": laplacian_display,
         "edge": edge
     }
-
-
-def log_edge(
-    image,
-    gaussian_size=5,
-    sigma=1.0,
-    zero_threshold=10.0
-):
-    """
-    Hàm rút gọn chỉ trả về ảnh biên LoG.
-    """
-
-    result = log_detector(
-        image,
-        gaussian_size=gaussian_size,
-        sigma=sigma,
-        zero_threshold=zero_threshold
-    )
-
-    return result["edge"]

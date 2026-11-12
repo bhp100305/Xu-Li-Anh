@@ -47,7 +47,7 @@ def convolution2d(image, kernel, padding="reflect"):
     # Chuyển sang float32 để tránh tràn số uint8
     image = image.astype(np.float32)
     kernel = kernel.astype(np.float32)
-    # Mathematical convolution flips the kernel along both axes.
+    # Lật kernel 180 độ để thực hiện đúng phép tích chập.
     kernel = np.flip(kernel, axis=(0, 1))
 
     # Tính số pixel cần padding
@@ -75,8 +75,7 @@ def convolution2d(image, kernel, padding="reflect"):
     if height == 0 or width == 0:
         return output
 
-    # Keep the same float32 products and reduction order as the scalar version.
-    # Sliding windows are views; only a bounded block of products is allocated.
+    # Trượt kernel trên ảnh; chia theo khối để hạn chế bộ nhớ tạm.
     windows = np.lib.stride_tricks.sliding_window_view(padded, (kh, kw))
     rows_per_block = max(1, (16 * 1024 * 1024) // (width * kh * kw * image.itemsize))
     for start in range(0, height, rows_per_block):

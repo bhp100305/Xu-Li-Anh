@@ -385,12 +385,11 @@ def compare_algorithms(
     if include_scans:
         for data in results.values():
             scan_start = time.perf_counter()
-            # Gradient detectors return intensity maps, while Canny/LoG
-            # return binary edges. Otsu preserves binary maps and gives the
-            # common paper detector a binary map for every algorithm.
+            # Đưa ảnh biên về nhị phân bằng Otsu trước khi tìm giấy.
             _, binary = cv2.threshold(data["edge"], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             data["detection_edge"] = binary
             try:
+                # Dùng biên của từng thuật toán để quét, không chạy lại Canny.
                 data["scan"] = scan_document(
                     image=image, detection_width=max_width, output_width=1000,
                     verbose=False, edge_image=binary,

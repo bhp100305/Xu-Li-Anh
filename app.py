@@ -328,6 +328,7 @@ def index() -> str | tuple[str, int]:
     """
 
     if request.method == "POST":
+        # Chọn luồng quét tài liệu hoặc so sánh thuật toán từ form.
         action = request.form.get("action", "scan")
         return scan() if action == "scan" else compare()
     active_tab = "compare" if request.args.get("tab") == "compare" else "scan"
@@ -667,13 +668,9 @@ def scan() -> tuple[str, int] | str:
 
 def compare() -> tuple[str, int] | str:
     """
-    Trang so sánh các thuật toán phát hiện biên.
+    Xử lý ảnh từ form so sánh các thuật toán phát hiện biên.
 
-    GET:
-        Hiển thị form upload.
-
-    POST:
-        Chạy:
+    Chạy:
         - Sobel
         - Prewitt
         - Laplacian
@@ -681,23 +678,6 @@ def compare() -> tuple[str, int] | str:
         - Canny tự cài
         - cv2.Canny
     """
-
-    # ========================================================
-    # GET
-    # ========================================================
-
-    if request.method == "GET":
-
-        return render_template(
-            "index.html",
-            comparison=False,
-                active_tab="compare",
-        )
-
-
-    # ========================================================
-    # POST
-    # ========================================================
 
     try:
 

@@ -61,6 +61,7 @@ def laplacian(image, kernel_type="4-neighbor"):
     # BƯỚC 3: Tích chập ảnh với kernel
     # ==========================================
 
+    # Đạo hàm bậc hai làm nổi vùng độ sáng thay đổi nhanh để tìm biên.
     response = convolution2d(
         gray,
         kernel
@@ -90,16 +91,3 @@ def laplacian(image, kernel_type="4-neighbor"):
         "response": response,
         "edge": edge
     }
-
-
-def laplacian_edge(image, kernel_type="4-neighbor"):
-    """
-    Hàm rút gọn chỉ trả về ảnh biên Laplacian.
-    """
-
-    result = laplacian(
-        image,
-        kernel_type
-    )
-
-    return result["edge"]

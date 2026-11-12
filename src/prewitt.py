@@ -58,6 +58,7 @@ def prewitt(image):
     # BƯỚC 4: Tính gradient X và Y
     # ==========================================
 
+    # Tính gradient hai hướng bằng Prewitt; trọng số mỗi hàng/cột đều nhau.
     gx = convolution2d(
         gray,
         kernel_x
@@ -109,13 +110,3 @@ def prewitt(image):
         "direction": direction,
         "edge": edge
     }
-
-
-def prewitt_edge(image):
-    """
-    Hàm rút gọn chỉ trả về ảnh biên Prewitt.
-    """
-
-    result = prewitt(image)
-
-    return result["edge"]

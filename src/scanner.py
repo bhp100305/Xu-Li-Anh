@@ -207,6 +207,7 @@ def scale_corners_to_original(
             "corners phải có kích thước (4, 2)."
         )
 
+    # Đổi góc từ ảnh thu nhỏ về ảnh gốc để nắn ảnh giữ được chi tiết.
     original_corners = (
         corners
         .astype(
@@ -776,43 +777,3 @@ def scan_document(
             scanned.shape[0]
         ),
     }
-
-
-def quick_scan(
-    image: np.ndarray,
-) -> np.ndarray:
-    """
-    Phiên bản rút gọn của scanner.
-
-    Nhận ảnh BGR và trả trực tiếp ảnh scan cuối.
-
-    Args:
-        image:
-            Ảnh BGR đầu vào.
-
-    Returns:
-        Ảnh scan hoàn chỉnh.
-    """
-
-    result = scan_document(
-        image=image,
-        verbose=False,
-    )
-
-
-    scanned = result[
-        "sharpened"
-    ]
-
-
-    if not isinstance(
-        scanned,
-        np.ndarray,
-    ):
-
-        raise RuntimeError(
-            "Kết quả scan không hợp lệ."
-        )
-
-
-    return scanned

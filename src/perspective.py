@@ -176,6 +176,7 @@ def perspective_transform(
     # BƯỚC 4: TÍNH MA TRẬN PERSPECTIVE
     # ==========================================
 
+    # Tính ma trận đưa bốn góc giấy về bốn góc hình chữ nhật.
     matrix = cv2.getPerspectiveTransform(
         ordered.astype(np.float32),
         destination
@@ -186,6 +187,7 @@ def perspective_transform(
     # BƯỚC 5: BIẾN ĐỔI ẢNH
     # ==========================================
 
+    # Nắn ảnh nghiêng thành trang phẳng bằng ma trận vừa tính.
     warped = cv2.warpPerspective(
         image,
         matrix,

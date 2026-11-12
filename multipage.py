@@ -30,7 +30,7 @@ def read_uploaded_image():
     raw = file.read(12 * 1024 * 1024 + 1)
     if len(raw) > 12 * 1024 * 1024:
         raise ValueError("Ảnh vượt quá 12 MB")
-    # Check dimensions before OpenCV allocates the decoded pixel buffer.
+    # Giới hạn số pixel trước khi giải mã để tránh tốn quá nhiều bộ nhớ.
     with Image.open(io.BytesIO(raw)) as source:
         if source.width * source.height > 20000000:
             raise ValueError("Ảnh vượt quá 20 triệu pixel")
@@ -46,6 +46,7 @@ def detect_page():
     try:
         image = read_uploaded_image()
         height, width = image.shape[:2]
+        # Thu nhỏ khung hình để gợi ý mép giấy nhanh trên camera.
         ratio = min(1.0, 480.0 / max(height, width))
         small = cv2.resize(image, (max(1, round(width * ratio)), max(1, round(height * ratio))))
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
@@ -79,8 +80,7 @@ def scan_page():
         return jsonify(error="Ảnh không hợp lệ"), 400
 
     try:
-        # Keep the original detector, coordinate scaling, perspective and
-        # sharpening pipeline. Camera overlay coordinates are guidance only.
+        # Quét trên ảnh gốc; khung gợi ý camera không quyết định vùng cắt.
         result = scan_document(
             image=image,
             detection_width=800,
@@ -123,12 +123,13 @@ def rectify_page():
         if (corners.shape != (4, 2) or not np.isfinite(corners).all()
                 or np.any(corners < 0) or np.any(corners > 1)):
             raise ValueError("Cần chọn đủ bốn góc trong ảnh gốc")
-        # Keep a clockwise polygon; reject crossing, repeated or tiny selections.
+        # Loại khung tự cắt, trùng góc hoặc quá nhỏ trước khi nắn ảnh.
         sides = np.roll(corners, -1, axis=0) - corners
         cross = sides[:, 0] * np.roll(sides[:, 1], -1) - sides[:, 1] * np.roll(sides[:, 0], -1)
         if np.any(cross <= 0) or cv2.contourArea(corners) < 0.01:
             raise ValueError("Bốn góc phải tạo thành khung giấy không giao nhau")
         height, width = image.shape[:2]
+        # Đổi góc người dùng chọn từ tỉ lệ 0–1 sang tọa độ pixel ảnh gốc.
         pixels = corners * np.float32([width - 1, height - 1])
         warped = perspective_transform(image, pixels, preserve_order=True)
         scanned = unsharp_mask(resize_output(warped, max_width=2400))["sharpened"]
@@ -176,6 +177,7 @@ def create_pdf():
 
         pdf_buffer = io.BytesIO()
 
+        # Ghép các ảnh theo thứ tự người dùng sắp xếp thành PDF nhiều trang.
         images[0].save(
             pdf_buffer,
             format="PDF",

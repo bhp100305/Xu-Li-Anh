@@ -175,6 +175,7 @@ async function detectFile(file, signal) {
     return validCorners(result.corners) ? result.corners : null;
 }
 
+// Nhận diện khung giấy để vẽ gợi ý, chưa tạo bản quét.
 async function detectLive(request) {
     if (request !== cameraRequest || !stream || screen !== 'live' || !pageViewer.hidden) return;
     try {
@@ -271,6 +272,7 @@ function storeCapture(file) {
     saveCapture.hidden = false;
 }
 
+// Chụp khung hình hiện tại và gửi quét, giữ camera cho trang tiếp theo.
 async function capturePhoto() {
     if (!stream || busy || openingCamera || !pageViewer.hidden) return;
     if (pages.length >= maxPages) { setStatus('Đã đủ 15 trang. Xuất PDF hoặc xóa bớt trang.'); return; }
@@ -639,6 +641,7 @@ function endCropEditor() {
     byId('viewerMessage').hidden = true;
 }
 
+// Gửi ảnh gốc và bốn góc đã chỉnh để thay bản quét của trang hiện tại.
 async function applyCrop() {
     if (busy || !editingCrop || !validCorners(cropCorners)) return;
     const page = pages[viewerIndex];

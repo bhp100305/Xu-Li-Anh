@@ -135,6 +135,7 @@ def sobel(image):
     # BƯỚC 4: Tính gradient theo x và y
     # ==========================================
 
+    # Hai kernel đo biến thiên sáng theo x và y; ghép lại thành độ mạnh biên.
     gx = convolution2d(
         gray,
         kernel_x
@@ -187,15 +188,3 @@ def sobel(image):
         "direction": direction,
         "edge": edge
     }
-
-
-def sobel_edge(image):
-    """
-    Hàm rút gọn chỉ trả về ảnh biên Sobel.
-
-    Dùng cho Flask hoặc các module khác.
-    """
-
-    result = sobel(image)
-
-    return result["edge"]

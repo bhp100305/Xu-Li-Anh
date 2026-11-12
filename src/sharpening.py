@@ -94,6 +94,7 @@ def unsharp_mask(
     # BƯỚC 4: TẠO UNSHARP MASK
     # ==========================================
 
+    # Lấy ảnh gốc trừ ảnh mờ để tách chi tiết, rồi cộng lại để làm nét.
     mask = (
         gray
         - blurred
@@ -175,52 +176,3 @@ def high_boost(
         sigma=sigma,
         amount=k
     )
-
-
-def sharpen_image(
-    image: np.ndarray,
-    method: str = "unsharp",
-    strength: float = 1.0
-) -> np.ndarray:
-    """
-    Hàm tiện ích để dùng trong Flask.
-
-    Args:
-        image:
-            Ảnh đầu vào.
-
-        method:
-            'unsharp' hoặc 'highboost'.
-
-        strength:
-            Hệ số làm nét.
-
-    Returns:
-        Ảnh sau khi làm nét.
-    """
-
-    method = method.lower()
-
-    if method == "unsharp":
-
-        result = unsharp_mask(
-            image=image,
-            amount=strength
-        )
-
-    elif method == "highboost":
-
-        if strength <= 1:
-            strength = 1.5
-
-        result = high_boost(
-            image=image,
-            k=strength
-        )
-
-    else:
-        raise ValueError(
-            "method phải là 'unsharp' hoặc 'highboost'."
-        )
-
-    return result["sharpened"]

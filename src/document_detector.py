@@ -21,8 +21,7 @@ def order_points(points: np.ndarray) -> np.ndarray:
 
     if not np.isfinite(points).all() or len(np.unique(points, axis=0)) != 4:
         raise ValueError("Bốn góc tài liệu phải khác nhau và có tọa độ hợp lệ.")
-    # Sort around the center instead of choosing four independent extrema.
-    # At ~45 degrees, sum/difference ties can otherwise select a corner twice.
+    # Sắp góc quanh tâm để tránh chọn trùng góc khi giấy nghiêng.
     center = points.mean(axis=0)
     angles = np.arctan2(points[:, 1] - center[1], points[:, 0] - center[0])
     ordered = points[np.argsort(angles)]
@@ -199,7 +198,7 @@ def find_document_from_hough(
     min_dimension = min(height, width)
     edges = np.clip(edge_image, 0, 255).astype(np.uint8)
 
-    # Bridge small gaps before Hough so a printed border can vote as one line.
+    # Nối khe hở nhỏ để Hough nhận được cạnh dài, ít đứt đoạn.
     edges = cv2.morphologyEx(
         edges,
         cv2.MORPH_CLOSE,
@@ -706,6 +705,7 @@ def detect_document(
     # CÁCH 1: EDGE
     # ==========================================
 
+    # Tìm tứ giác từ đường bao của ảnh biên.
     corners = find_document_from_edges(
         edge_image
     )
@@ -717,6 +717,7 @@ def detect_document(
     # CÁCH 2: HOUGH-LINE FALLBACK
     # ==========================================
 
+    # Ghép đoạn thẳng Hough thành khung; chọn nếu điểm tốt hơn contour.
     hough_candidates = []
     hough_corners = None if preview_only else find_document_from_hough(
         edge_image, candidate_quads=hough_candidates,
@@ -742,10 +743,10 @@ def detect_document(
             paper_area = abs(float(cv2.contourArea(paper_corners)))
             current_area = abs(float(cv2.contourArea(corners)))
             intersection, _ = cv2.intersectConvexConvex(paper_corners, corners.astype(np.float32))
-            # A large enclosing paper outline beats a strong printed table.
+            # Ưu tiên mép giấy ngoài để tránh cắt nhầm vào bảng in bên trong.
             use_paper = (current_area > 0 and paper_area > current_area * 1.12
                          and intersection / current_area > 0.90)
-            # Also remove background included by a loose bounding rectangle.
+            # Thu khung nếu kết quả hiện tại lấy dư nền ngoài giấy.
             use_paper = use_paper or (paper_area > 0 and current_area > paper_area * 1.12
                                      and paper_area / current_area > 0.75
                                      and intersection / paper_area > 0.95)
@@ -757,6 +758,7 @@ def detect_document(
     if corners is not None and np.array_equal(corners, full_frame):
         method = "full-frame"
     if method != "full-frame" and np.any(edge_image):
+        # So độ liên tục bốn cạnh để nhận thêm bề mặt kín như màn hình.
         maps = _surface_maps(image, edge_image)
         surface, quality = find_supported_surface(image, edge_image, maps,
                                                    None if preview_only else hough_candidates)
@@ -769,6 +771,7 @@ def detect_document(
     if corners is None:
         method = "none"
     elif method not in ("surface", "full-frame") and not preview_only:
+        # Tách lại vùng giấy để giảm phần nền hoặc bàn tay dính vào khung.
         refined = refine_document_region(image, corners)
         if refined is not None:
             corners, method = refined, "paper-region"

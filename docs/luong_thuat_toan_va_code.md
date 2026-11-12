@@ -337,7 +337,7 @@ Nguồn: `src/sharpening.py`.
 3. Unsharp cộng amount×mask vào gray; amount mặc định 1.0.
 4. High-boost yêu cầu k>1 rồi gọi lại unsharp_mask(amount=k), mặc định k=1.5. Đây là công thức thực tế của dự án.
 5. clip_uint8 cắt giá trị vượt miền, khác với kéo giãn min–max của ảnh biên.
-Đầu ra sharpened là ảnh xám, kể cả khi đầu vào BGR. Hàm tiện ích sharpen_image tự đổi strength<=1 thành 1.5 khi chọn highboost.
+Đầu ra sharpened là ảnh xám, kể cả khi đầu vào BGR. Pipeline scan_document tự đổi sharpening_strength<=1 thành 1.5 khi chọn highboost.
 
 ### Code `clip_uint8` – dòng 8
 
@@ -366,22 +366,6 @@ def high_boost(image: np.ndarray, k: float=1.5, gaussian_size: int=5, sigma: flo
     if k <= 1:
         raise ValueError('High-Boost yêu cầu k > 1.')
     return unsharp_mask(image=image, gaussian_size=gaussian_size, sigma=sigma, amount=k)
-```
-
-### Code `sharpen_image` – dòng 180
-
-```python
-def sharpen_image(image: np.ndarray, method: str='unsharp', strength: float=1.0) -> np.ndarray:
-    method = method.lower()
-    if method == 'unsharp':
-        result = unsharp_mask(image=image, amount=strength)
-    elif method == 'highboost':
-        if strength <= 1:
-            strength = 1.5
-        result = high_boost(image=image, k=strength)
-    else:
-        raise ValueError("method phải là 'unsharp' hoặc 'highboost'.")
-    return result['sharpened']
 ```
 
 ## 8. Phát hiện trang giấy: contour, Hough và độ sáng

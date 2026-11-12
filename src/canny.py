@@ -38,8 +38,8 @@ def non_maximum_suppression(magnitude, direction):
 
     current = magnitude[1:-1, 1:-1]
     inner_angle = angle[1:-1, 1:-1]
-    # Array coordinates have y increasing downwards. A +45 degree gradient
-    # must compare NW/SE; -45 (135 modulo 180) must compare NE/SW.
+    # So với hai điểm theo hướng gradient; chỉ giữ cực đại để làm mảnh biên.
+    # Trục y của ảnh hướng xuống nên cần chọn đúng cặp điểm chéo.
     directions = (
         (((inner_angle >= 0) & (inner_angle < 22.5))
          | ((inner_angle >= 157.5) & (inner_angle <= 180)),
@@ -77,6 +77,7 @@ def automatic_thresholds(gray, sigma=0.33):
     high_threshold : float
     """
 
+    # Dùng trung vị độ sáng để tự chọn hai ngưỡng Canny.
     median_value = np.median(gray)
 
     low_threshold = max(
@@ -115,6 +116,7 @@ def double_threshold(
         dtype=np.uint8
     )
 
+    # Chia điểm ảnh thành biên mạnh, biên yếu và nền theo hai ngưỡng.
     strong_y, strong_x = np.where(
         (image > 0) & (image >= high_threshold)
     )
@@ -184,8 +186,7 @@ def hysteresis(
         strong_flat[seeds.reshape(-1)] = True
         weak_flat[seeds.reshape(-1)] = False
         offsets = (-width - 1, -width, -width + 1, -1, 1, width - 1, width, width + 1)
-        # Each connected weak pixel is visited once instead of rescanning
-        # every pixel until an entire weak chain has propagated.
+        # Duyệt 8 láng giềng bằng hàng đợi, giữ biên yếu nối với biên mạnh.
         while pending:
             current = pending.popleft()
             for offset in offsets:
